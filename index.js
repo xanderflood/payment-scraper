@@ -1,5 +1,6 @@
 const ProtonMail = require('protonmail-api');
 const { Client } = require('pg');
+
 const cheerio = require('cheerio');
 
 const Entities = require('html-entities').AllHtmlEntities;
@@ -10,11 +11,17 @@ const logger = new Logger({ level: 'error'});
 
 class UnrecognizedEmailError extends Error {}
 
+function parseDOM(str) {
+	return cheerio.load(str, {
+		normalizeWhitespace: true
+	})
+}
+
 function parseFloatSafe(str) {
 	return parseFloat(str.replace(/,/g, ""));
 }
 
-const CapitalOneTransactionEmailRegex = /As requested, we&rsquo;re notifying you that on (.*), at (.*), a pending\n\tauthorization or purchase in the amount of \$([\,\d]+(?:\.\d+|)) was placed/
+const CapitalOneTransactionEmailRegex = /As requested, we&rsquo;re notifying you that on (?:.*), at (.*), a pending\n\tauthorization or purchase in the amount of \$([\,\d]+(?:\.\d+|)) was placed/
 function scrapeCapitalOneEmail(email, body) {
 	const info = {
 		institution: "Capital One",
@@ -23,9 +30,9 @@ function scrapeCapitalOneEmail(email, body) {
 	if (email.subject.startsWith("A new transaction was charged")) {
 		const matches = CapitalOneTransactionEmailRegex.exec(body);
 
-		info.merchant = entities.decode(matches[2]);
+		info.merchant = entities.decode(matches[1]);
 
-		info.amount_string = entities.decode(matches[3]);
+		info.amount_string = entities.decode(matches[2]);
 		info.deposit = true
 		if (info.amount == NaN) info.amount = null;
 	} else {
@@ -73,7 +80,6 @@ function scrapeVenmoEmail(email, body) {
 		institution: "Venmo",
 	};
 
-	//use cheerio
 	if (email.subject.startsWith("You paid")) {
 		var matches   = VenmoPaymentOutPushSubjectRegex.exec(email.subject);
 		info.merchant = matches[1];
@@ -99,7 +105,7 @@ function scrapeVenmoEmail(email, body) {
 		throw new UnrecognizedEmailError
 	}
 
-	const $ = cheerio.load(body);
+	const $ = parseDOM(body);
 	info.notes = $("td div p").text();
 
 	return info
@@ -170,6 +176,8 @@ function scrapeTransactionInfo(email, body) {
 
 			await db.connect();
 
+			await db.query(`DROP TABLE transactions CASCADE`);
+
 			await db.query(`CREATE TABLE IF NOT EXISTS categories
 				(	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 					name varchar UNIQUE
@@ -235,7 +243,7 @@ function scrapeTransactionInfo(email, body) {
 						ON CONFLICT (id) DO NOTHING;`,
 						[email.id, email.from.email, email.subject, info.institution, info.transaction_date, info.merchant, info.amount_string, info.amount, info.notes]);
 
-					await email.removeLabel(label);
+					// await email.removeLabel(label); TODO
 				}
 			}
 		} finally {
