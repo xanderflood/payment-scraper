@@ -8,8 +8,6 @@ class UnrecognizedEmailError extends Error {}
 const scraper = require('./scraper');
 const bot = require('./bot');
 
-// TODO refactor envar config into one place
-
 const interval = 300000 // 5 minutes
 scraper.startLoop(interval);
 

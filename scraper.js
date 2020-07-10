@@ -4,6 +4,9 @@ const { Client } = require('pg');
 
 const cheerio = require('cheerio');
 
+const Logger = require('node-json-logger');
+const logger = new Logger();
+
 const Entities = require('html-entities').AllHtmlEntities;
 const entities = new Entities();
 
@@ -173,8 +176,6 @@ async function scrapeOnce(
 	notificationChatID,
 	dev,
 ) {
-	console.log("Scanning...");
-
 	const pm = await ProtonMail.connect({
 		username: pmUsername,
 		password: pmPassword,
@@ -217,10 +218,10 @@ async function scrapeOnce(
 						const shortID = await database.upsertTransaction(
 							email.id, email.from.email, email.subject, info.institution, info.transaction_date, info.merchant, info.amount_string, info.amount, info.notes)
 
-						// if (!dev) {
+						if (!dev) {
 							const notesStr = info.notes ? `\: "${tgmd.escape(info.notes)}"` : ""
 							bot.sendMDV2Message(notificationChatID, `\`\[${shortID}\]\` \$${tgmd.escape(info.amount_string)} \@ ${tgmd.escape(info.merchant)}${notesStr}`);
-						// }
+						}
 					}
 
 					if (!dev) await email.removeLabel(label);
@@ -236,6 +237,8 @@ async function scrapeOnce(
 
 function startLoop(interval) {
 	const helper = () => {
+		logger.info("scanning");
+
 		scrapeOnce(
 			process.env["PROTONMAIL_USERNAME"],
 			process.env["PROTONMAIL_PASSWORD"],
@@ -243,8 +246,11 @@ function startLoop(interval) {
 			notificationChatID,
 			!!process.env["DEVELOPMENT"],
 		)
-			.then(()    => console.log("Scanned."))
-			.catch(e    => console.log(e))
+			.then(() => logger.info("scan finished"))
+			.catch(e => logger.error(`scan failed`, {
+				error: e,
+				stack: e.stack,
+			}))
 			.finally(() => setTimeout(helper, interval));
 	};
 

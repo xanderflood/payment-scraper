@@ -1,11 +1,14 @@
 const TelegramBot = require('node-telegram-bot-api');
 
-const bot = new TelegramBot(process.env["TELEGRAM_BOT_API_TOKEN"], { polling: true });
-const notificationChatID = process.env["TELEGRAM_BOT_API_CHAT_ID"];
-bot.on("polling_error", (err) => console.log(err));
-
 const Logger = require('node-json-logger');
 const logger = new Logger({ level: 'error'});
+
+const bot = new TelegramBot(process.env["TELEGRAM_BOT_API_TOKEN"], { polling: true });
+const notificationChatID = process.env["TELEGRAM_BOT_API_CHAT_ID"];
+bot.on("polling_error", e => logger.error(e, {
+	error: e,
+	stack: e.stack,
+}));
 
 const {markdownv2: tgmd} = require('telegram-format');
 
