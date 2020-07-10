@@ -9,7 +9,7 @@ steps:
 - name: tags
   image: golang
   commands:
-  - echo -n "build-\${DRONE_BUILD_NUMBER},commit-\${DRONE_COMMIT::8}" > .tags
+  - echo -n "build-$${DRONE_BUILD_NUMBER},commit-$${DRONE_COMMIT::8}" > .tags
 
 - name: docker
   image: plugins/docker
