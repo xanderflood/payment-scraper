@@ -10,7 +10,7 @@ RUN curl -sL https://deb.nodesource.com/setup_14.x | bash - \
 
 COPY package.json .
 COPY yarn.lock .
-COPY *.js .
+COPY *.js ./
 RUN yarn install
 
 CMD [ "node", "index.js" ]
