@@ -5,7 +5,7 @@ workspace:
   base: /src
   path: github.com/xanderflood/payment-scraper
 
-# steps:
+steps:
 # - name: tags
 #   image: alpine
 #   commands:
