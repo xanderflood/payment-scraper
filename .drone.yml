@@ -11,11 +11,11 @@ steps:
   commands:
     - echo -n "build-${DRONE_BUILD_NUMBER},commit-${DRONE_COMMIT::8}" > .tags
 
-- name: docker  
-  image: plugins/docker
-  settings:
-    username: 
-      from_secret: docker_username
-    password: 
-      from_secret: docker_password
-    repo: xanderflood/payment-scraper
+# - name: docker
+#   image: plugins/docker
+#   settings:
+#     username:
+#       from_secret: docker_username
+#     password:
+#       from_secret: docker_password
+#     repo: xanderflood/payment-scraper
