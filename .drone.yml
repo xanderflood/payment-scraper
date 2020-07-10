@@ -7,8 +7,11 @@ workspace:
 
 steps: 
 - name: tags
-  image: golang
+  image: alpine
   commands:
+  - echo ${DRONE_BUILD_NUMBER}
+  - echo ${DRONE_COMMIT}
+  - echo ${DRONE_COMMIT::8}
   - echo -n "build-$${DRONE_BUILD_NUMBER},commit-$${DRONE_COMMIT::8}" > .tags
 
 - name: docker
