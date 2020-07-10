@@ -1,15 +1,16 @@
 FROM ubuntu:bionic
 
 RUN apt-get update \
-	&& apt-get install -y curl
+	&& apt-get install -y curl yarn
 RUN curl -sL https://deb.nodesource.com/setup_14.x | bash - \
 	&& apt-get install -y nodejs chromium-browser
 RUN node -v
 
-COPY package*.json ./
+COPY package.json yarn.lock
 COPY *.js ./
-RUN npm install
-###############################################################
+RUN yarn install
+
+CMD [ "node", "index.js" ]
 
 # FROM zenika/alpine-chrome:81-with-puppeteer
 
