@@ -2,12 +2,15 @@ FROM ubuntu:bionic
 
 RUN apt-get update \
 	&& apt-get install -y curl yarn
+
+# Puppeteer is going to install chromium, but doing this
+# will make sure all the necessary dependencies are there.
 RUN curl -sL https://deb.nodesource.com/setup_14.x | bash - \
 	&& apt-get install -y nodejs chromium-browser
-RUN node -v
 
-COPY package.json yarn.lock
-COPY *.js ./
+COPY package.json .
+COPY yarn.lock .
+COPY *.js .
 RUN yarn install
 
 CMD [ "node", "index.js" ]
