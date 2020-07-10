@@ -1,9 +1,9 @@
+process.env.NTBA_FIX_319 = 1;
 const TelegramBot = require('node-telegram-bot-api');
 
 const Logger = require('node-json-logger');
 const logger = new Logger({ level: 'error'});
 
-process.env.NTBA_FIX_319 = 1;
 const bot = new TelegramBot(process.env["TELEGRAM_BOT_API_TOKEN"], { polling: true });
 const notificationChatID = process.env["TELEGRAM_BOT_API_CHAT_ID"];
 bot.on("polling_error", e => logger.error(e, {

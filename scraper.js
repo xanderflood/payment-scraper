@@ -1,5 +1,4 @@
 const ProtonMail = require('protonmail-api');
-const TelegramBot = require('node-telegram-bot-api');
 const { Client } = require('pg');
 
 const cheerio = require('cheerio');
@@ -182,53 +181,45 @@ async function scrapeOnce(
 	});
 
 	try {
-		const db = new Client();
+		const label = await pm.getLabelByName(pmLabelName);
+		var page = await pm.getEmails(label, 0);
 
-		try {
-			const label = await pm.getLabelByName(pmLabelName);
-			var page = await pm.getEmails(label, 0);
+		await database.setupDB(dev);
 
-			await db.connect();
+		for (var pageNum = 0; page.length > 0; page = await pm.getEmails(label, ++pageNum)) {
+			for (var i = page.length - 1; i >= 0; i--) {
+				email = page[i]
+				const body = await email.getBody();
 
-			database.setupDB(dev);
+				var info;
+				try {
+					info = scrapeTransactionInfo(email, body);
+				} catch (e) {
+					emailURL = "https://mail.protonmail.com/inbox/${email.id}"
+					logger.error("unrecognized email", {
+						subject: email.subject,
+						from: email.from.email,
+						url: emailURL,
+						error: e.toString(),
+						stack: e.stack,
+					});
 
-			for (var pageNum = 0; page.length > 0; page = await pm.getEmails(label, ++pageNum)) {
-				for (var i = page.length - 1; i >= 0; i--) {
-					email = page[i]
-					const body = await email.getBody();
-
-					var info;
-					try {
-						info = scrapeTransactionInfo(email, body);
-					} catch (e) {
-						emailURL = "https://mail.protonmail.com/inbox/${email.id}"
-						logger.error("unrecognized email", {
-							subject: email.subject,
-							from: email.from.email,
-							url: emailURL,
-							error: e.toString(),
-							stack: e.stack,
-						});
-
-						if (!dev) bot.sendMDV2Message(notificationChatID, `Unrecognized email [\"${tgmd.escape(email.subject)}\"](${emailURL}) from ${tgmd.inspect(email.from.email)}`);
-						continue;
-					}
-
-					if (info) {
-						const shortID = await database.upsertTransaction(
-							email.id, email.from.email, email.subject, info.institution, info.transaction_date, info.merchant, info.amount_string, info.amount, info.notes)
-
-						if (!dev) {
-							const notesStr = info.notes ? `\: "${tgmd.escape(info.notes)}"` : ""
-							bot.sendMDV2Message(notificationChatID, `\`\[${shortID}\]\` \$${tgmd.escape(info.amount_string)} \@ ${tgmd.escape(info.merchant)}${notesStr}`);
-						}
-					}
-
-					if (!dev) await email.removeLabel(label);
+					if (!dev) bot.sendMDV2Message(notificationChatID, `Unrecognized email [\"${tgmd.escape(email.subject)}\"](${emailURL}) from ${tgmd.inspect(email.from.email)}`);
+					continue;
 				}
+
+				if (info) {
+					const shortID = await database.upsertTransaction(
+						email.id, email.from.email, email.subject, info.institution, info.transaction_date, info.merchant, info.amount_string, info.amount, info.notes)
+
+					if (!dev) {
+						const notesStr = info.notes ? `\: "${tgmd.escape(info.notes)}"` : ""
+						bot.sendMDV2Message(notificationChatID, `\`\[${shortID}\]\` \$${tgmd.escape(info.amount_string)} \@ ${tgmd.escape(info.merchant)}${notesStr}`);
+					}
+				}
+
+				if (!dev) await email.removeLabel(label);
 			}
-		} finally {
-			await db.end();
 		}
 	} finally {
 		await pm.close();
