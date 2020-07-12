@@ -9,7 +9,7 @@ async function _withConnection(action) {
 
 async function setupDB(dev) {
 	return _withConnection(async db => {
-		if (dev) await db.query(`DROP TABLE transactions CASCADE`);
+		if (dev) await db.query(`DROP TABLE IF EXISTS transactions CASCADE`);
 
 		await db.query(`CREATE TABLE IF NOT EXISTS categories
 			(	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

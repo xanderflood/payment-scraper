@@ -1,8 +1,10 @@
 const ProtonMail = require('protonmail-api');
-const TelegramBot = require('node-telegram-bot-api');
 const { Client } = require('pg');
 
 const cheerio = require('cheerio');
+
+const Logger = require('node-json-logger');
+const logger = new Logger();
 
 const Entities = require('html-entities').AllHtmlEntities;
 const entities = new Entities();
@@ -173,61 +175,51 @@ async function scrapeOnce(
 	notificationChatID,
 	dev,
 ) {
-	console.log("Scanning...");
-
 	const pm = await ProtonMail.connect({
 		username: pmUsername,
 		password: pmPassword,
 	});
 
 	try {
-		const db = new Client();
+		const label = await pm.getLabelByName(pmLabelName);
+		var page = await pm.getEmails(label, 0);
 
-		try {
-			const label = await pm.getLabelByName(pmLabelName);
-			var page = await pm.getEmails(label, 0);
+		await database.setupDB(dev);
 
-			await db.connect();
+		for (var pageNum = 0; page.length > 0; page = await pm.getEmails(label, ++pageNum)) {
+			for (var i = page.length - 1; i >= 0; i--) {
+				email = page[i]
+				const body = await email.getBody();
 
-			database.setupDB(dev);
+				var info;
+				try {
+					info = scrapeTransactionInfo(email, body);
+				} catch (e) {
+					emailURL = "https://mail.protonmail.com/inbox/${email.id}"
+					logger.error("unrecognized email", {
+						subject: email.subject,
+						from: email.from.email,
+						url: emailURL,
+						error: e.toString(),
+						stack: e.stack,
+					});
 
-			for (var pageNum = 0; page.length > 0; page = await pm.getEmails(label, ++pageNum)) {
-				for (var i = page.length - 1; i >= 0; i--) {
-					email = page[i]
-					const body = await email.getBody();
-
-					var info;
-					try {
-						info = scrapeTransactionInfo(email, body);
-					} catch (e) {
-						emailURL = "https://mail.protonmail.com/inbox/${email.id}"
-						logger.error("unrecognized email", {
-							subject: email.subject,
-							from: email.from.email,
-							url: emailURL,
-							error: e.toString(),
-							stack: e.stack,
-						});
-
-						if (!dev) bot.sendMDV2Message(notificationChatID, `Unrecognized email [\"${tgmd.escape(email.subject)}\"](${emailURL}) from ${tgmd.inspect(email.from.email)}`);
-						continue;
-					}
-
-					if (info) {
-						const shortID = await database.upsertTransaction(
-							email.id, email.from.email, email.subject, info.institution, info.transaction_date, info.merchant, info.amount_string, info.amount, info.notes)
-
-						// if (!dev) {
-							const notesStr = info.notes ? `\: "${tgmd.escape(info.notes)}"` : ""
-							bot.sendMDV2Message(notificationChatID, `\`\[${shortID}\]\` \$${tgmd.escape(info.amount_string)} \@ ${tgmd.escape(info.merchant)}${notesStr}`);
-						// }
-					}
-
-					if (!dev) await email.removeLabel(label);
+					if (!dev) bot.sendMDV2Message(notificationChatID, `Unrecognized email [\"${tgmd.escape(email.subject)}\"](${emailURL}) from ${tgmd.inspect(email.from.email)}`);
+					continue;
 				}
+
+				if (info) {
+					const shortID = await database.upsertTransaction(
+						email.id, email.from.email, email.subject, info.institution, info.transaction_date, info.merchant, info.amount_string, info.amount, info.notes)
+
+					if (!dev) {
+						const notesStr = info.notes ? `\: "${tgmd.escape(info.notes)}"` : ""
+						bot.sendMDV2Message(notificationChatID, `\`\[${shortID}\]\` \$${tgmd.escape(info.amount_string)} \@ ${tgmd.escape(info.merchant)}${notesStr}`);
+					}
+				}
+
+				if (!dev) await email.removeLabel(label);
 			}
-		} finally {
-			await db.end();
 		}
 	} finally {
 		await pm.close();
@@ -236,6 +228,8 @@ async function scrapeOnce(
 
 function startLoop(interval) {
 	const helper = () => {
+		logger.info("scanning");
+
 		scrapeOnce(
 			process.env["PROTONMAIL_USERNAME"],
 			process.env["PROTONMAIL_PASSWORD"],
@@ -243,8 +237,11 @@ function startLoop(interval) {
 			notificationChatID,
 			!!process.env["DEVELOPMENT"],
 		)
-			.then(()    => console.log("Scanned."))
-			.catch(e    => console.log(e))
+			.then(() => logger.info("scan finished"))
+			.catch(e => logger.error(`scan failed`, {
+				error: e,
+				stack: e.stack,
+			}))
 			.finally(() => setTimeout(helper, interval));
 	};
 
