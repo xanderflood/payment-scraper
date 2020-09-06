@@ -34,7 +34,9 @@ async function setupDB(dev) {
 				notes varchar,
 
 				-- manual fields
-				processed BOOL DEFAULT FALSE,
+				is_transfer BOOL DEFAULT FALSE,
+				is_refunded BOOL DEFAULT FALSE,
+				is_processed BOOL DEFAULT FALSE,
 				category_id UUID REFERENCES categories(id),
 				additional_notes varchar
 			)`);
@@ -48,7 +50,7 @@ async function setupDB(dev) {
 				transactions
 			GROUP BY (EXTRACT(MONTH FROM transaction_date), category_id)`);
 		await db.query(`CREATE OR REPLACE VIEW unprocessed
-			AS SELECT * FROM transactions WHERE (NOT processed)`);
+			AS SELECT * FROM transactions WHERE (NOT is_processed)`);
 		await db.query(`CREATE OR REPLACE VIEW broken
 			AS SELECT * FROM transactions
 			WHERE amount IS NULL`);
@@ -86,9 +88,9 @@ async function categorizeTransaction(shortID, catSlug, notes) {
 			UPDATE transactions
 			SET category_id = (SELECT id FROM category),
 				additional_notes = $2,
-				processed = TRUE
+				is_processed = TRUE
 			WHERE short_id = $3
-			  AND processed = false
+			  AND is_processed = false
 			RETURNING (SELECT name FROM category)`,
 			[catSlug, notes, shortID])).rows[0].name;
 	})

@@ -9,11 +9,10 @@ const logger = new Logger();
 const Entities = require('html-entities').AllHtmlEntities;
 const entities = new Entities();
 
-const database = require('./database');
+const database = require('../database');
 
 const notificationChatID = process.env["TELEGRAM_BOT_API_CHAT_ID"];
 
-const bot = require('./bot');
 const {markdownv2: tgmd} = require('telegram-format');
 
 class UnrecognizedEmailError extends Error {}
@@ -204,7 +203,7 @@ async function scrapeOnce(
 						stack: e.stack,
 					});
 
-					if (!dev) bot.sendMDV2Message(notificationChatID, `Unrecognized email [\"${tgmd.escape(email.subject)}\"](${emailURL}) from ${tgmd.inspect(email.from.email)}`);
+					if (!dev) logger.error(`Unrecognized email [\"${tgmd.escape(email.subject)}\"](${emailURL}) from ${tgmd.inspect(email.from.email)}`);
 					continue;
 				}
 
@@ -214,7 +213,7 @@ async function scrapeOnce(
 
 					if (!dev) {
 						const notesStr = info.notes ? `\: "${tgmd.escape(info.notes)}"` : ""
-						bot.sendMDV2Message(notificationChatID, `\`\[${shortID}\]\` \$${tgmd.escape(info.amount_string)} \@ ${tgmd.escape(info.merchant)}${notesStr}`);
+						logger.error(`\`\[${shortID}\]\` \$${tgmd.escape(info.amount_string)} \@ ${tgmd.escape(info.merchant)}${notesStr}`);
 					}
 				}
 
@@ -231,6 +230,7 @@ function startLoop(interval) {
 		logger.info("scanning");
 
 		scrapeOnce(
+			logger,
 			process.env["PROTONMAIL_USERNAME"],
 			process.env["PROTONMAIL_PASSWORD"],
 			process.env["PROTONMAIL_LABEL_NAME"],

@@ -5,10 +5,10 @@ const logger = new Logger({ level: 'error'});
 
 class UnrecognizedEmailError extends Error {}
 
-const scraper = require('./scraper');
+const protonmail = require('./protonmail');
 const bot = require('./bot');
 
 const interval = 300000 // 5 minutes
-scraper.startLoop(interval);
+protonmail.startLoop(interval);
 
 bot.start();
