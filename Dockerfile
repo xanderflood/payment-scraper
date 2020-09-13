@@ -11,9 +11,12 @@ RUN curl -sL https://deb.nodesource.com/setup_14.x | bash - \
 	&& apt-get update \
 	&& apt-get install -y nodejs chromium-browser yarn
 
-COPY package.json .
-COPY yarn.lock .
-COPY *.js ./
+WORKDIR /src
+
+COPY package.json package.json
+COPY yarn.lock yarn.lock
+COPY src/ src/
+COPY bin/ bin/
 RUN yarn install
 
 RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
@@ -21,4 +24,4 @@ RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
     && chown -R pptruser:pptruser /home/pptruser
 USER pptruser
 
-CMD [ "node", "index.js" ]
+ENTRYPOINT [ "./bin/run" ]

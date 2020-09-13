@@ -1,15 +1,21 @@
 kind: pipeline
-name: payment-scraper
+name: default
 
 workspace:
   base: /src
   path: github.com/xanderflood/payment-scraper
 
-steps: 
+steps:
 - name: tags
   image: alpine
   commands:
   - echo -n "build-$${DRONE_BUILD_NUMBER},commit-$${DRONE_COMMIT::8}" > .tags
+
+- name: test
+  image: node
+  commands:
+  - yarn install
+  # TODO npm test
 
 - name: docker
   image: plugins/docker

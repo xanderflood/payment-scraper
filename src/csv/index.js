@@ -1,6 +1,6 @@
 var csv = require('csv');
 
-const venmoHeader = ["Username", "ID", "Datetime", "Type", "Status", "Note", "From", "To", "Amount (total)", "Amount (fee)", "Funding Source", "Destination", "Beginning Balance", "Ending Balance", "Statement Period Venmo Fees", "Year to Date Venmo Fees", "Disclaimer"];
+const venmoHeader = ["Username", "ID", "Datetime", "Type", "Status", "Note", "From", "To", "Amount (total)", "Amount (fee)", "Funding Source", "Destination", "Beginning Balance", "Ending Balance", "Statement Period Venmo Fees", "Terminal Location", "Year to Date Venmo Fees", "Disclaimer"];
 const cashAppHeader = ["Transaction ID", "Date", "Transaction Type", "Currency", "Amount", "Fee", "Net Amount", "Asset Type", "Asset Price", "Asset Amount", "Status", "Notes", "Name of sender/receiver", "Account"];
 const boaCreditHeader = ["Posted Date", "Reference Number", "Payee", "Address", "Amount"]
 const capitalOneHeader = ["Transaction Date", "Posted Date", "Card No.", "Description", "Category", "Debit", "Credit"]
@@ -30,6 +30,7 @@ const adapterFactories = {
         if (row[2] == "PAYMENT - THANK YOU") return "transfer"
         if (row[2].startsWith("Square Inc DES:* Cash App")) return "transfer";
         if (row[2].startsWith("VENMO DES:CASHOUT")) return "transfer";
+        if (row[2].startsWith("VENMO DES:PAYMENT")) return "transfer";
   
         return "regular"
       },
@@ -58,11 +59,12 @@ const adapterFactories = {
         if (row[1].startsWith("CAPITAL ONE DES:CRCARDPMT")) return "transfer";
         if (row[1].startsWith("Square Inc DES:* Cash App")) return "transfer";
         if (row[1].startsWith("VENMO DES:CASHOUT")) return "transfer";
+        if (row[1].startsWith("VENMO DES:PAYMENT")) return "transfer";
 
         return "regular";
       },
       id: (row, _) => "",
-      amount: (row, _) => "-"+row[2],
+      amount: (row, _) => row[2],
       date: (row, _) => row[0],
       notes: (row, _) => "",
       merchant: (row, _) => row[1],
@@ -82,14 +84,14 @@ const adapterFactories = {
   
         return "regular"
       },
-      id: (row, _) => "",
+      id: (row, _) => row[0],
       amount: (row, _) => {
-        if (row[3].length != 0) {
-          return row[3]
+        if (row[4].length != 0) {
+          return row[4]
         }
         return row[5]
       },
-      date: (row, _) => row[0],
+      date: (row, _) => row[1],
       notes: (row, _) => "",
       merchant: (row, _) => row[3],
       skipRows: 3,
@@ -108,7 +110,7 @@ const adapterFactories = {
           return "skip"
         }
         if (i == 1) {
-          username == row[0];
+          username = row[0];
   
           return "skip"
         }
@@ -123,7 +125,7 @@ const adapterFactories = {
       date: (row, _) => row[2],
       notes: (row, _) => row[5],
       merchant: (row, _) => {
-        if (row[6] == username) {
+        if (row[6].replace(/\ /g, "-") == username) {
           return "Venmo - "+row[7]
         }
         return "Venmo - "+row[6]
@@ -164,6 +166,7 @@ const adapterFactories = {
         if (row[4] == "Payment/Credit") return "transfer"
         if (row[3].startsWith("Square Inc DES:* Cash App")) return "transfer";
         if (row[3].startsWith("VENMO DES:CASHOUT")) return "transfer";
+        if (row[3].startsWith("VENMO DES:PAYMENT")) return "transfer";
 
         return "regular"
       },
@@ -181,26 +184,14 @@ const adapterFactories = {
   },
 };
 
-(function(input, output, mode) {
+function TransformRecords(input, mode) {
   var fct = adapterFactories[mode];
   if (!fct) throw new UnrecognizedAdapterError
   var adapter = fct();
 
   var parser = csv.parse({
-    from_line: adapter.skipRows+1,
-  });
-  var stringifier = csv.stringify({
-  	header: true,
-    parallel: 1,
-  	columns: [
-      "source_system",
-      "source_system_id",
-  		"merchant",
-  		"date",
-  		"amount",
-  		"notes",
-      "transfer",
-  	],
+    from_line: adapter.skipRows+1 || undefined,
+    skip_empty_lines: true,
   });
 
   var i = -1;
@@ -228,9 +219,8 @@ const adapterFactories = {
     }
   });
 
-  input.pipe(parser)
+  return input.pipe(parser)
     .pipe(transformer)
-    .pipe(stringifier)
-    .pipe(output);
+}
 
-})(process.stdin, process.stdout, process.argv[2]);
+module.exports = { TransformRecords, modes: Object.keys(adapterFactories) };
