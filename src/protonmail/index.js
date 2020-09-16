@@ -277,25 +277,28 @@ async function scrapeAsynchronously(
 	}
 }
 
-function scrapeAllUnprocessedEmailsFromAccount(
+function scraperPeriodically(
+	interval,
 	username,
 	password,
 	labelName,
 	database,
 	development,
 ) {
-	scrapeAsynchronously(
-		username,
-		password,
-		labelName,
-		database,
-		!!development)
-		.then(() => logger.info("scan finished"))
-		.catch(e => logger.error(`scan failed`, {
-			error: e,
-			stack: e.stack,
-		}))
-		.finally(() => setTimeout(helper, interval));
+	setInterval(() => {
+		scrapeAsynchronously(
+			username,
+			password,
+			labelName,
+			database,
+			!!development,
+		)
+			.then(() => logger.info("scan finished"))
+			.catch(e => logger.error("scan failed", {
+				error: e,
+				stack: e.stack,
+			}))
+	}, interval);
 }
 
-module.exports = { scrapeAllUnprocessedEmailsFromAccount }
+module.exports = { scraperPeriodically }
