@@ -1,9 +1,9 @@
-const { Client } = require('pg');
+const { Pool } = require('pg');
 
 function Database(pgConnectionOptions) {
 	// helper functions
 	async function _withConnection(action) {
-		const db = new Client(pgConnectionOptions);
+		const db = new Pool(pgConnectionOptions);
 		await db.connect();
 
 		return await action(db);
@@ -36,7 +36,7 @@ function Database(pgConnectionOptions) {
 					amount numeric NOT NULL,
 					notes varchar,
 
-					-- TODO 
+					-- TODO remove and make this a category maybe?
 					transfer BOOL DEFAULT FALSE,
 
 					-- manual fields
@@ -111,10 +111,6 @@ function Database(pgConnectionOptions) {
 }
 
 function Upserter(database) {
-	// TODO find some way to share the connection rather than
-	// reopening it each time - possible a pq.Pool instead of
-	// pg.Client?
-
 	return new Transform({
 		objectMode: true,
 		transform(record, _, next) {
