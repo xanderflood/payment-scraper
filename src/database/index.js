@@ -1,12 +1,16 @@
 const { Pool } = require('pg');
 
 function Database(pgConnectionOptions) {
+	const db = new Pool(pgConnectionOptions);
+
 	// helper functions
 	async function _withConnection(action) {
-		const db = new Pool(pgConnectionOptions);
 		await db.connect();
 
-		return await action(db);
+		const result = await action(db);
+
+		db.close()
+		return result
 	}
 
 	// public API
