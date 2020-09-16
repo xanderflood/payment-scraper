@@ -285,7 +285,7 @@ function scraperPeriodically(
 	database,
 	development,
 ) {
-	setInterval(() => {
+	const helper = () => {
 		scrapeAsynchronously(
 			username,
 			password,
@@ -298,7 +298,10 @@ function scraperPeriodically(
 				error: e,
 				stack: e.stack,
 			}))
-	}, interval);
+	}
+
+	setImmediate(helper);
+	setInterval(helper, interval);
 }
 
 module.exports = { scraperPeriodically }
