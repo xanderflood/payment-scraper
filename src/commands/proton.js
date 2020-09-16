@@ -1,13 +1,13 @@
 const {Command, flags} = require('@oclif/command')
 const {Database} = require ('../database');
-const {scrapeAllUnprocessedEmailsFromAccount} = require('../protonmail');
+const {scraperPeriodically} = require('../protonmail');
 
 class ProtonCommand extends Command {
   async run() {
     const {flags} = this.parse(ProtonCommand)
 
     const database = new Database({ connectionString: flags.postgresConnection })
-    scrapeAllUnprocessedEmailsFromAccount(
+    scraperPeriodically(
       flags.interval,
       flags.username,
       flags.password,
