@@ -5,25 +5,21 @@ function Database(pgConnectionOptions) {
 
 	// helper functions
 	async function _withConnection(action) {
-		await db.connect();
-
-		const result = await action(db);
-
-		db.close()
-		return result
+		conn = await db.connect();
+		return await action(db);
 	}
 
 	// public API
 	this.setupDB = (dev) => {
-		return _withConnection(async db => {
-			if (dev) await db.query(`DROP TABLE IF EXISTS transactions CASCADE`);
+		return _withConnection(async conn => {
+			if (dev) await conn.query(`DROP TABLE IF EXISTS transactions CASCADE`);
 
-			await db.query(`CREATE TABLE IF NOT EXISTS categories
+			await conn.query(`CREATE TABLE IF NOT EXISTS categories
 				(	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 					name varchar UNIQUE,
 					slug varchar UNIQUE
 				)`);
-			await db.query(`CREATE TABLE IF NOT EXISTS transactions
+			await conn.query(`CREATE TABLE IF NOT EXISTS transactions
 				(	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 					short_id varchar UNIQUE GENERATED ALWAYS AS (substring(id::varchar, 0, 5)) STORED,
 
@@ -51,7 +47,7 @@ function Database(pgConnectionOptions) {
 					additional_notes varchar
 				)`);
 
-			await db.query(`CREATE OR REPLACE VIEW overview
+			await conn.query(`CREATE OR REPLACE VIEW overview
 				AS SELECT
 					EXTRACT(MONTH FROM transaction_date),
 					category_id,
@@ -59,34 +55,34 @@ function Database(pgConnectionOptions) {
 				FROM
 					transactions
 				GROUP BY (EXTRACT(MONTH FROM transaction_date), category_id)`);
-			await db.query(`CREATE OR REPLACE VIEW unprocessed
+			await conn.query(`CREATE OR REPLACE VIEW unprocessed
 				AS SELECT * FROM transactions WHERE (NOT is_processed)`);
-			await db.query(`CREATE OR REPLACE VIEW broken
+			await conn.query(`CREATE OR REPLACE VIEW broken
 				AS SELECT * FROM transactions
 				WHERE amount IS NULL`);
 		});
 	};
 	this.getCategories = async () => {
-		return _withConnection(async db => {
-			return (await db.query(`SELECT slug, name FROM categories`)).rows;
+		return _withConnection(async conn => {
+			return (await conn.query(`SELECT slug, name FROM categories`)).rows;
 		})
 	};
 	this.getUnprocessedTransactions = async () => {
-		return _withConnection(async db => {
-			return (await db.query(`SELECT short_id, amount, merchant FROM unprocessed`)).rows;
+		return _withConnection(async conn => {
+			return (await conn.query(`SELECT short_id, amount, merchant FROM unprocessed`)).rows;
 		})
 	};
 	this.addCategory = async (slug, name) => {
-		return _withConnection(async db => {
-			await db.query(`
+		return _withConnection(async conn => {
+			await conn.query(`
 				INSERT INTO categories (slug, name)
 				VALUES ($1, $2);`,
 				[slug, name]);
 		})
 	};
 	this.categorizeTransaction = async (shortID, catSlug, notes) => {
-		return _withConnection(async db => {
-			return (await db.query(`
+		return _withConnection(async conn => {
+			return (await conn.query(`
 				WITH category as (
 					SELECT * FROM categories
 					WHERE slug = $1)
@@ -102,8 +98,8 @@ function Database(pgConnectionOptions) {
 		})
 	};
 	this.upsertTransaction = async (emailID, from, subject, inst, date, merchant, amountStr, amount, notes) => {
-		return _withConnection(async db => {
-			return (await db.query(`
+		return _withConnection(async conn => {
+			return (await conn.query(`
 				INSERT INTO transactions (proton_email_id, source, subject, institution, transaction_date, merchant, amount_string, amount, notes)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 				ON CONFLICT (id) DO NOTHING
