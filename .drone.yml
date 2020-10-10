@@ -2,10 +2,6 @@ kind: pipeline
 type: kubernetes
 name: default
 
-workspace:
-  base: /src
-  path: github.com/xanderflood/payment-scraper
-
 steps:
 - name: tags
   image: alpine
