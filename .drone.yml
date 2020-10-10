@@ -12,7 +12,7 @@ steps:
   image: node
   commands:
   - yarn install
-  - eslint .
+  - yarn run eslint .
 
 - name: docker
   image: plugins/docker
