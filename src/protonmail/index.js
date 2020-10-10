@@ -1,13 +1,9 @@
 const ProtonMail = require('protonmail-api');
-
 const cheerio = require('cheerio');
-
 const Logger = require('node-json-logger');
 const logger = new Logger();
-
 const Entities = require('html-entities').AllHtmlEntities;
 const entities = new Entities();
-
 const {markdownv2: tgmd} = require('telegram-format');
 
 class UnrecognizedEmailError extends Error {}
@@ -164,7 +160,6 @@ function scrapeDeltaEmail(email, body) {
 	if (email.subject.startsWith("You have")) {
 		var matches   = DeltaMerchantRegex.exec(body);
 		info.merchant = matches[1];
-		console.log("MERCHANTMERCHANTMERCHANTMERCHANTO", info.merchant)
 		if (email.subject.startsWith("You have incurred")) {
 			info.amount_string = matches[2];
 		} else if (email.subject.startsWith("You have received")) {
@@ -219,7 +214,7 @@ function scrapeTransactionInfo(email, body) {
 	return info
 }
 
-async function scrapeAsynchronously(
+async function scrapeOnce(
 	pmUsername,
 	pmPassword,
 	pmLabelName,
@@ -234,8 +229,6 @@ async function scrapeAsynchronously(
 	try {
 		const label = await pm.getLabelByName(pmLabelName);
 		var page = await pm.getEmails(label, 0);
-
-		await database.setupDB(development);
 
 		for (var pageNum = 0; page.length > 0; page = await pm.getEmails(label, ++pageNum)) {
 			for (var i = page.length - 1; i >= 0; i--) {
@@ -260,10 +253,24 @@ async function scrapeAsynchronously(
 				}
 
 				if (info) {
-					const shortID = await database.upsertTransaction(
-						email.id, email.from.email, email.subject, info.institution, info.transaction_date, info.merchant, info.amount_string, info.amount, info.notes)
+					const shortID = await database.createTransaction({
+						sourceSystem:    "protonmail",
+						sourceSystemId:  email.id,
+						sourceSystemMeta: {
+							from: email.from.email,
+							subject: email.subject,
+						},
+
+						transactionDate: info.transaction_date,
+						institution:     info.institution,
+						merchant:        info.merchant,
+						amountString:    info.amount_string,
+						amount:          info.amount,
+						notes:           info.notes,
+					});
 
 					if (!development) {
+						// TODO this is a message that _should_ be sent to telegram, not the logs
 						const notesStr = info.notes ? `\: "${tgmd.escape(info.notes)}"` : ""
 						logger.error(`\`\[${shortID}\]\` \$${tgmd.escape(info.amount_string)} \@ ${tgmd.escape(info.merchant)}${notesStr}`);
 					}
@@ -277,31 +284,4 @@ async function scrapeAsynchronously(
 	}
 }
 
-function scraperPeriodically(
-	interval,
-	username,
-	password,
-	labelName,
-	database,
-	development,
-) {
-	const helper = () => {
-		scrapeAsynchronously(
-			username,
-			password,
-			labelName,
-			database,
-			!!development,
-		)
-			.then(() => logger.info("scan finished"))
-			.catch(e => logger.error("scan failed", {
-				error: e,
-				stack: e.stack,
-			}))
-	}
-
-	setImmediate(helper);
-	setInterval(helper, interval);
-}
-
-module.exports = { scraperPeriodically }
+module.exports = { scrapeOnce }

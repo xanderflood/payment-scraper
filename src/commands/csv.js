@@ -1,9 +1,10 @@
-const {Command, flags} = require('@oclif/command')
+const { Command, flags } = require('@oclif/command')
 const { Database } = require ('../database');
 const protonmail = require('../protonmail');
-var { TransformRecords, modes } = require('../csv')
-var csv = require('csv');
-var { createReadStream, createWriteStream } = require('fs'); 
+const { TransformRecords, modes } = require('../csv')
+const csv = require('csv');
+const { createReadStream, createWriteStream } = require('fs');
+const { Transform } = require('stream-transform');
 
 const Logger = require('node-json-logger');
 const logger = new Logger();
@@ -12,20 +13,19 @@ class CSVCommand extends Command {
   async run() {
     const {flags, args} = this.parse(CSVCommand)
 
-
     var input = process.stdin
     if (args.inputFile != '-') {
       input = createReadStream(args.inputFile);
     }
 
-    const recordStream = TransformRecords(input, args.mode);
+    const db = new Database(flags.postgresConnection, flags.development);
 
+    const recordStream = TransformRecords(input, args.mode, !flags.postgresConnection);
     if (flags.postgresConnection) {
-      const database = new Database({ connectionString: flags.postgresConnection });
-      const upserter = new Upserter()
+      await db.initialize();
 
       recordStream.
-        pipe(upserter);
+        pipe(db.initAsyncUpserter());
     } else {
       var stringifier = csv.stringify({
         header: true,
@@ -65,7 +65,8 @@ CSVCommand.args = [
 ]
 
 CSVCommand.flags = {
-  postgresConnection: flags.string({char: 'p', env: "POSTGRES_CONNECTION_STRING", description: 'Postgres connection URI', required: false})
+  postgresConnection: flags.string({char: 'p', env: "POSTGRES_CONNECTION_STRING", description: 'Postgres connection URI', required: false}),
+  development: flags.boolean({char: 'd', env: "DEVELOPMENT", description: 'development mode', default: true}),
 }
 
 module.exports = CSVCommand

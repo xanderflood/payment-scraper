@@ -1,14 +1,13 @@
 const {Command, flags} = require('@oclif/command')
 const {Database} = require ('../database');
-const {scraperPeriodically} = require('../protonmail');
+const {scrapeOnce} = require('../protonmail');
 
 class ProtonCommand extends Command {
   async run() {
     const {flags} = this.parse(ProtonCommand)
 
-    const database = new Database({ connectionString: flags.postgresConnection })
-    scraperPeriodically(
-      flags.interval,
+    const database = new Database(flags.postgresConnection, flags.development);
+    await scrapeOnce(
       flags.username,
       flags.password,
       flags.labelName,
@@ -26,7 +25,6 @@ ProtonCommand.flags = {
   labelName: flags.string({char: 'l', env: "PROTONMAIL_LABEL_NAME", description: 'protonmail flag to identify unprocessed notifications', default: 'Unprocessed'}),
   postgresConnection: flags.string({char: 'c', env: "POSTGRES_CONNECTION_STRING", description: 'Postgres connection URI', required: true}),
   development: flags.boolean({char: 'd', env: "DEVELOPMENT", description: 'development mode', default: true}),
-  interval: flags.integer({char: 'i', env: "INTERVAL", description: 'inteval', default: 60*60*1000 /* hourly */ }),
 }
 
 module.exports = ProtonCommand

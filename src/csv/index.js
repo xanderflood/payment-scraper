@@ -39,6 +39,7 @@ const adapterFactories = {
       date: (row, _) => row[0],
       notes: (row, _) => "",
       merchant: (row, _) => row[2],
+      institution: () => "boa",
     }
   },
   boaBank: () => {
@@ -68,6 +69,7 @@ const adapterFactories = {
       date: (row, _) => row[0],
       notes: (row, _) => "",
       merchant: (row, _) => row[1],
+      institution: () => "boa",
       skipRows: 7,
     }
   },
@@ -92,8 +94,9 @@ const adapterFactories = {
         return row[5]
       },
       date: (row, _) => row[1],
-      notes: (row, _) => "",
+      notes: (row, _) => row[2],
       merchant: (row, _) => row[3],
+      institution: () => "delta",
       skipRows: 3,
     }
   },
@@ -130,6 +133,7 @@ const adapterFactories = {
         }
         return "Venmo - "+row[6]
       },
+      institution: () => "venmo",
     };
   },
   cashApp: () => {
@@ -151,6 +155,7 @@ const adapterFactories = {
       date: (row, _) => row[1].replace(/\ /g, "T"),
       merchant: (row, _) => "CashApp - "+row[12],
       notes: (row, _) => row[11],
+      institution: () => "CashApp",
     }
   },
   capitalOne: () => {
@@ -180,11 +185,12 @@ const adapterFactories = {
       date: (row, _) => row[0],
       merchant: (row, _) => row[3],
       notes: (row, _) => "",
+      institution: () => "capitalone",
     }
   },
 };
 
-function TransformRecords(input, mode) {
+function TransformRecords(input, mode, outputRows = true) {
   var fct = adapterFactories[mode];
   if (!fct) throw new UnrecognizedAdapterError
   var adapter = fct();
@@ -204,15 +210,30 @@ function TransformRecords(input, mode) {
     case "transfer":
       transfer = true;
     case "regular":
-      this.push([
-        mode,
-        adapter.id(row),
-        adapter.merchant(row),
-        adapter.date(row),
-        parseFloat(adapter.amount(row).replace(/[\$\s,]/g,"")),
-        adapter.notes(row),
-        transfer.toString(),
-      ]);
+      var output = {
+        sourceSystem: "csv|"+mode,
+        sourceSystemId: adapter.id(row),
+
+        transactionDate: adapter.date(row),
+        institution: adapter.institution(),
+        merchant: adapter.merchant(row),
+        amountString: adapter.amount(row),
+        amount: parseFloat(adapter.amount(row).replace(/[\$\s,]/g,"")),
+        notes: adapter.notes(row),
+
+        // TODO once the processor is built, remove this _and_ add a whitelist to the database module
+        isTransfer: transfer,
+      };
+      if (outputRows) output = [
+        output.sourceSystem,
+        output.sourceSystemId,
+        output.merchant,
+        output.transactionDate,
+        output.amount,
+        output.notes,
+        output.isTransfer.toString(),
+      ];
+      this.push(output);
       break;
     default:
       throw new InvalidRowClassificationError;

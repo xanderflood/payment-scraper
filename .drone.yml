@@ -15,7 +15,7 @@ steps:
   image: node
   commands:
   - yarn install
-  # TODO npm test
+  - eslint .
 
 - name: docker
   image: plugins/docker

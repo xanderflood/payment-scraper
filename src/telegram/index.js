@@ -2,7 +2,7 @@ process.env.NTBA_FIX_319 = 1;
 const TelegramBot = require('node-telegram-bot-api');
 
 const Logger = require('node-json-logger');
-const logger = new Logger({ level: 'error'});
+const logger = new Logger();
 
 const {markdownv2: tgmd} = require('telegram-format');
 
@@ -29,6 +29,7 @@ function Bot(apiToken, apiChatID, database) {
 
 	const _handle = (regex, description, handler) => {
 		bot.onText(regex, (...args) => {
+			logger.info(`handling ${regex}`)// TODO remove
 			if (args[0].chat.id != apiChatID) {
 				_handleBotError(description, e)
 				return
@@ -41,6 +42,7 @@ function Bot(apiToken, apiChatID, database) {
 
 	// API
 	this.start = () => {
+		logger.info("starting to set up handlers")// TODO remove
 		_handle(/\/start/, "starting", (msg) => {
 			_sendMDV2Message(tgmd.escape(`Welcome! Enter /help to get started.`));
 		});
@@ -81,7 +83,7 @@ function Bot(apiToken, apiChatID, database) {
 		_handle(/\/addcat ([a-zA-Z]+) (.+)$/, "adding a new category", async (msg, match) => {
 			const slug = match[1];
 			const name = match[2];
-			const cats = await database.addCategory(slug, name);
+			const cats = await database.addCategory({slug: slug, name: name});
 
 			_sendMDV2Message(`Category "${name}" \`\[${slug}\]\``);
 		});
@@ -94,6 +96,8 @@ function Bot(apiToken, apiChatID, database) {
 
 			_sendMDV2Message(`Categorized transcation \`\[${trShortID}\]\` "${catName}" \`\[${catSlug}\]\`\\\.`);
 		});
+
+		logger.info("finished setting up bot handlers")// TODO remove
 	}
 }
 

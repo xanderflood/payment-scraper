@@ -16,9 +16,10 @@ WORKDIR /src
 
 COPY package.json package.json
 COPY yarn.lock yarn.lock
-COPY src/ src/
+RUN yarn install --production
+
 COPY bin/ bin/
-RUN yarn install
+COPY src/ src/
 
 RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
     && mkdir -p /home/pptruser/Downloads \

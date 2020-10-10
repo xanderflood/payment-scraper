@@ -1,133 +1,128 @@
-const { Pool } = require('pg');
+const { Sequelize, Model, DataTypes } = require('sequelize');
+const { v4: uuidv4 } = require('uuid');
+const { Transform } = require('stream');
 
-function Database(pgConnectionOptions) {
-	const db = new Pool(pgConnectionOptions);
+class Transaction extends Model {}
+class Category extends Model {}
 
-	// helper functions
-	async function _withConnection(action) {
-		conn = await db.connect();
-		return await action(db);
+class RecordNotFoundError extends Error {
+  constructor(type, id) {
+    super(`Could not find record of type \`${type}\` with id \`${id}\``)
+
+    this.type = type;
+    this.id = id;
+  }
+}
+
+class Database {
+	constructor(connectionURL, development){
+		this._data = [];
+
+		const sequelize = new Sequelize(connectionURL);
+
+		Category.init({
+			id: { type: Sequelize.UUID, primaryKey: true },
+			name: { type: Sequelize.STRING, unique: true, allowNull: false },
+			slug: { type: Sequelize.STRING, unique: true, allowNull: false },
+		}, { sequelize, modelName: 'category' });
+
+		Transaction.init({
+			id:      { type: Sequelize.UUID, primaryKey: true },
+			shortId: { type: Sequelize.STRING, unique: true },
+
+			// scraper metadata
+			sourceSystem:     { type: Sequelize.STRING },
+			sourceSystemId:   { type: Sequelize.STRING },
+			sourceSystemMeta: { type: Sequelize.JSONB },
+
+			// inferred fields
+			transactionDate: { type: Sequelize.DATE, allowNull: false },
+			institution:     { type: Sequelize.STRING, allowNull: false },
+			merchant:        { type: Sequelize.STRING, allowNull: false },
+			amountString:    { type: Sequelize.STRING, allowNull: false },
+			amount:          { type: Sequelize.DOUBLE, allowNull: false },
+			notes:           { type: Sequelize.STRING },
+
+			// manual fields
+			isTransfer:          { type: Sequelize.BOOLEAN, default: false, allowNull: false },
+			isRefunded:          { type: Sequelize.BOOLEAN, default: false, allowNull: false },
+			isPossibleDuplicate: { type: Sequelize.BOOLEAN, default: false, allowNull: false },
+			isProcessed:         { type: Sequelize.BOOLEAN, default: false, allowNull: false },
+			systemNotes:         { type: Sequelize.STRING },
+
+			categoryId: { type: Sequelize.UUID, references: { model: Category, key: 'id' } },
+		}, { sequelize, modelName: 'transaction' });
+
+		Transaction.beforeCreate(async (tr, options) => {
+			tr.id = uuidv4();
+			tr.shortId = tr.id.slice(0, 5);
+		});
 	}
 
-	// public API
-	this.setupDB = (dev) => {
-		return _withConnection(async conn => {
-			if (dev) await conn.query(`DROP TABLE IF EXISTS transactions CASCADE`);
+	async initialize() {
+		await Category.sync({ force: development });
+		await Transaction.sync({ force: development });
+	}
 
-			await conn.query(`CREATE TABLE IF NOT EXISTS categories
-				(	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-					name varchar UNIQUE,
-					slug varchar UNIQUE
-				)`);
-			await conn.query(`CREATE TABLE IF NOT EXISTS transactions
-				(	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-					short_id varchar UNIQUE GENERATED ALWAYS AS (substring(id::varchar, 0, 5)) STORED,
+	async getCategories() {
+		return await Category.findAll();
+	}
+	async getUnprocessedTransactions() {
+		return await Transaction.findAll({ where: { isProcessed: false }, });
+	}
+	async addCategory(attrs) {
+		return await Category.create(attrs);
+	}
+	async categorizeTransaction(trShortId, catSlug, notes="") {
+		// allow full UUIDs as well
+		trShortId = trShortId.slice(0, 5);
+		catSlug = catSlug.slice(0, 5);
 
-					-- protonmail fields
-					proton_email_id varchar UNIQUE,
-					source varchar NOT NULL,
-					subject varchar NOT NULL,
+		var cats = Category.findAll({ where: { slug: catSlug } });
+		if (cats.length < 1) throw new RecordNotFoundError("category", catSlug);
 
-					-- inferred fields
-					institution varchar NOT NULL,
-					transaction_date DATE NOT NULL,
-					merchant varchar NOT NULL,
-					amount_string varchar NOT NULL,
-					amount numeric NOT NULL,
-					notes varchar,
+		var transactions = await Transaction.update(
+			{ categoryId: cats[0].id, notes: notes },
+			{ where: { shortId: trShortId } },
+		)
+		if (transactions.length < 1) throw new RecordNotFoundError("transaction", trShortId);
+		return transactions[0];
+	}
+	async createTransaction(attrs) {
+		var whitelistedFields = (({sourceSystem, sourceSystemId, sourceSystemMeta, transactionDate, institution, merchant, amountString, amount, notes}) =>
+			({sourceSystem, sourceSystemId, sourceSystemMeta, transactionDate, institution, merchant, amountString, amount, notes}))(attrs);
 
-					-- TODO remove and make this a category maybe?
-					transfer BOOL DEFAULT FALSE,
+		return await Transaction.create(attrs);
+	}
+	async saveTransactionProcessingResult(trShortId, update) {
+		trShortId = trShortId.slice(0, 5);
 
-					-- manual fields
-					is_transfer BOOL DEFAULT FALSE,
-					is_refunded BOOL DEFAULT FALSE,
-					is_processed BOOL DEFAULT FALSE,
-					category_id UUID REFERENCES categories(id),
-					additional_notes varchar
-				)`);
+		var whitelistedFields = (({categoryId, isTransfer, isRefunded, isPossibleDuplicate, systemNotes}) =>
+			({categoryId, isTransfer, isRefunded, isPossibleDuplicate, systemNotes}))(update);
 
-			await conn.query(`CREATE OR REPLACE VIEW overview
-				AS SELECT
-					EXTRACT(MONTH FROM transaction_date),
-					category_id,
-					sum(amount)
-				FROM
-					transactions
-				GROUP BY (EXTRACT(MONTH FROM transaction_date), category_id)`);
-			await conn.query(`CREATE OR REPLACE VIEW unprocessed
-				AS SELECT * FROM transactions WHERE (NOT is_processed)`);
-			await conn.query(`CREATE OR REPLACE VIEW broken
-				AS SELECT * FROM transactions
-				WHERE amount IS NULL`);
+		var transactions = await Transaction.update(
+			{	isProcessed: true,
+				...whitelistedFields
+			},
+			{ where: { shortId: trShortId } },
+		);
+		if (transactions.length < 1) throw new RecordNotFoundError("transaction", trShortId);
+
+		return transactions[0];
+	}
+
+	initAsyncUpserter() {
+		return new Transform({
+			objectMode: true,
+			async transform(record, _, next) {
+				await database.createTransaction(record);
+				next(null, record);
+			},
 		});
-	};
-	this.getCategories = async () => {
-		return _withConnection(async conn => {
-			return (await conn.query(`SELECT slug, name FROM categories`)).rows;
-		})
-	};
-	this.getUnprocessedTransactions = async () => {
-		return _withConnection(async conn => {
-			return (await conn.query(`SELECT short_id, amount, merchant FROM unprocessed`)).rows;
-		})
-	};
-	this.addCategory = async (slug, name) => {
-		return _withConnection(async conn => {
-			await conn.query(`
-				INSERT INTO categories (slug, name)
-				VALUES ($1, $2);`,
-				[slug, name]);
-		})
-	};
-	this.categorizeTransaction = async (shortID, catSlug, notes) => {
-		return _withConnection(async conn => {
-			return (await conn.query(`
-				WITH category as (
-					SELECT * FROM categories
-					WHERE slug = $1)
+	}
 
-				UPDATE transactions
-				SET category_id = (SELECT id FROM category),
-					additional_notes = $2,
-					is_processed = TRUE
-				WHERE short_id = $3
-				  AND is_processed = false
-				RETURNING (SELECT name FROM category)`,
-				[catSlug, notes, shortID])).rows[0].name;
-		})
-	};
-	this.upsertTransaction = async (emailID, from, subject, inst, date, merchant, amountStr, amount, notes) => {
-		return _withConnection(async conn => {
-			return (await conn.query(`
-				INSERT INTO transactions (proton_email_id, source, subject, institution, transaction_date, merchant, amount_string, amount, notes)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-				ON CONFLICT (id) DO NOTHING
-				RETURNING short_id;`,
-				[emailID, from, subject, inst, date, merchant, amountStr, amount, notes])
-			).rows[0].short_id;
-		})
-	};
+	// TODO disable this in dev mode
+	// async unProcessAllTransactions() {}
 }
 
-function Upserter(database) {
-	return new Transform({
-		objectMode: true,
-		transform(record, _, next) {
-			database.upsertTransaction(
-				null, // email metadata
-				null, // email metadata
-				null, // email metadata
-				record[0], //institution
-				record[3], //transaction_date
-				record[2], //merchant
-				"", //amount_string
-				record[4], //amount
-				record[5]) //notes
-			next(null, record)
-		},
-		flush(done) {}
-	});
-}
-
-module.exports = { Database, Upserter }
+module.exports = { Database, RecordNotFoundError }
