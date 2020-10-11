@@ -21,7 +21,7 @@ RUN yarn install --production
 COPY bin/ bin/
 COPY src/ src/
 
-RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
+RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser --uid 1500 \
     && mkdir -p /home/pptruser/Downloads \
     && chown -R pptruser:pptruser /home/pptruser
 USER pptruser
