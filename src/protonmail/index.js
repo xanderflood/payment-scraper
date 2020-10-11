@@ -221,26 +221,52 @@ async function scrapeOnce(
 	database,
 	development,
 ) {
-	const pm = await ProtonMail.connect({
-		username: pmUsername,
-		password: pmPassword,
-	});
+	let pm;
 
 	try {
-		const label = await pm.getLabelByName(pmLabelName);
-		var page = await pm.getEmails(label, 0);
+		try {
+			pm = await ProtonMail.connect({
+				username: pmUsername,
+				password: pmPassword,
+			});
+		} catch (err) {
+			logger.error("protonmail: failed to connect", err)
+			throw err
+		}
+
+		let label;
+		try {
+			label = await pm.getLabelByName(pmLabelName);
+		} catch (err) {
+			logger.error(`protonmail: failed to get label \`${pmLabelName}\``, err)
+			throw err
+		}
+
+		let page;
+		try {
+			page = await pm.getEmails(label, 0);
+		} catch (err) {
+			logger.error(`protonmail: failed get emails`, err)
+			throw err
+		}
 
 		for (var pageNum = 0; page.length > 0; page = await pm.getEmails(label, ++pageNum)) {
 			for (var i = page.length - 1; i >= 0; i--) {
 				email = page[i]
-				const body = await email.getBody();
+				let body;
+				try {
+					body = await email.getBody();
+				} catch (err) {
+					logger.error(`protonmail: failed to get email body`, err)
+					throw err
+				}
 
 				var info;
 				try {
 					info = scrapeTransactionInfo(email, body);
 				} catch (e) {
 					emailURL = "https://mail.protonmail.com/inbox/${email.id}"
-					logger.error("unrecognized email", {
+					logger.error("failed processing email", {
 						subject: email.subject,
 						from: email.from.email,
 						url: emailURL,
@@ -248,31 +274,38 @@ async function scrapeOnce(
 						stack: e.stack,
 					});
 
-					if (!development) logger.error(`Unrecognized email [\"${tgmd.escape(email.subject)}\"](${emailURL}) from ${tgmd.inspect(email.from.email)}`);
+					logger.error(`Unrecognized email [\"${email.subject}\"](${emailURL}) from ${email.from.email}`);
+					logger.error(`Telegramized: Unrecognized email [\"${tgmd.escape(email.subject)}\"](${emailURL}) from ${tgmd.escape(email.from.email)}`);
 					continue;
 				}
 
 				if (info) {
-					const shortID = await database.createTransaction({
-						sourceSystem:    "protonmail",
-						sourceSystemId:  email.id,
-						sourceSystemMeta: {
-							from: email.from.email,
-							subject: email.subject,
-						},
+					let tr;
+					try {
+						tr = await database.createTransaction({
+							sourceSystem:    "protonmail",
+							sourceSystemId:  email.id,
+							sourceSystemMeta: {
+								from: email.from.email,
+								subject: email.subject,
+							},
 
-						transactionDate: info.transaction_date,
-						institution:     info.institution,
-						merchant:        info.merchant,
-						amountString:    info.amount_string,
-						amount:          info.amount,
-						notes:           info.notes,
-					});
+							transactionDate: info.transaction_date,
+							institution:     info.institution,
+							merchant:        info.merchant,
+							amountString:    info.amount_string,
+							amount:          info.amount,
+							notes:           info.notes,
+						});
+					} catch (err) {
+						logger.error(`protonmail: failed to save transaction`, err)
+						throw err
+					}
 
 					if (!development) {
 						// TODO this is a message that _should_ be sent to telegram, not the logs
 						const notesStr = info.notes ? `\: "${tgmd.escape(info.notes)}"` : ""
-						logger.error(`\`\[${shortID}\]\` \$${tgmd.escape(info.amount_string)} \@ ${tgmd.escape(info.merchant)}${notesStr}`);
+						logger.error(`\`\[${tr.shortId}\]\` \$${tgmd.escape(info.amount_string)} \@ ${tgmd.escape(info.merchant)}${notesStr}`);
 					}
 				}
 

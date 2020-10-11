@@ -17,8 +17,9 @@ class RecordNotFoundError extends Error {
 class Database {
 	constructor(connectionURL, development){
 		this._data = [];
+		this.development = development;
 
-		const sequelize = new Sequelize(connectionURL);
+		const sequelize = new Sequelize(connectionURL, { logging: false });
 
 		Category.init({
 			id: { type: Sequelize.UUID, primaryKey: true },
@@ -44,10 +45,10 @@ class Database {
 			notes:           { type: Sequelize.STRING },
 
 			// manual fields
-			isTransfer:          { type: Sequelize.BOOLEAN, default: false, allowNull: false },
-			isRefunded:          { type: Sequelize.BOOLEAN, default: false, allowNull: false },
-			isPossibleDuplicate: { type: Sequelize.BOOLEAN, default: false, allowNull: false },
-			isProcessed:         { type: Sequelize.BOOLEAN, default: false, allowNull: false },
+			isTransfer:          { type: Sequelize.BOOLEAN, defaultValue: false, allowNull: false },
+			isRefunded:          { type: Sequelize.BOOLEAN, defaultValue: false, allowNull: false },
+			isPossibleDuplicate: { type: Sequelize.BOOLEAN, defaultValue: false, allowNull: false },
+			isProcessed:         { type: Sequelize.BOOLEAN, defaultValue: false, allowNull: false },
 			systemNotes:         { type: Sequelize.STRING },
 
 			categoryId: { type: Sequelize.UUID, references: { model: Category, key: 'id' } },
@@ -60,8 +61,8 @@ class Database {
 	}
 
 	async initialize() {
-		await Category.sync({ force: development });
-		await Transaction.sync({ force: development });
+		await Category.sync({ force: this.development });
+		await Transaction.sync({ force: this.development });
 	}
 
 	async getCategories() {
