@@ -1,6 +1,7 @@
 const { Sequelize, Model, DataTypes } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
 const { Transform } = require('stream');
+const crypto = require('crypto');
 
 class Transaction extends Model {}
 class Category extends Model {}
@@ -32,9 +33,10 @@ class Database {
 			shortId: { type: Sequelize.STRING, unique: true },
 
 			// scraper metadata
-			sourceSystem:     { type: Sequelize.STRING },
-			sourceSystemId:   { type: Sequelize.STRING },
-			sourceSystemMeta: { type: Sequelize.JSONB },
+			sourceSystem:       { type: Sequelize.STRING },
+			sourceSystemId:     { type: Sequelize.STRING },
+			sourceSystemMeta:   { type: Sequelize.JSONB },
+			sourceSystemDigest: { type: Sequelize.STRING },
 
 			// inferred fields
 			transactionDate: { type: Sequelize.DATE, allowNull: false },
@@ -57,6 +59,10 @@ class Database {
 		Transaction.beforeCreate(async (tr, options) => {
 			tr.id = uuidv4();
 			tr.shortId = tr.id.slice(0, 5);
+
+			tr.sourceSystemDigest = crypto.createHash('md5')
+				.update(JSON.stringify(tr.sourceSystemMeta))
+				.digest("hex");
 		});
 	}
 
@@ -98,8 +104,11 @@ class Database {
 	async saveTransactionProcessingResult(trShortId, update) {
 		trShortId = trShortId.slice(0, 5);
 
-		var whitelistedFields = (({categoryId, isTransfer, isRefunded, isPossibleDuplicate, systemNotes}) =>
-			({categoryId, isTransfer, isRefunded, isPossibleDuplicate, systemNotes}))(update);
+		var cats = Category.findAll({ where: { slug: update.catSlug } });
+		if (cats.length < 1) throw new RecordNotFoundError("category", catSlug);
+
+		var whitelistedFields = (({isTransfer, isRefunded, isPossibleDuplicate, systemNotes}) =>
+			({isTransfer, isRefunded, isPossibleDuplicate, systemNotes}))(update);
 
 		var transactions = await Transaction.update(
 			{	isProcessed: true,
