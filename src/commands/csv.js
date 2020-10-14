@@ -18,7 +18,7 @@ class CSVCommand extends Command {
       input = createReadStream(args.inputFile);
     }
 
-    const recordStream = await TransformRecords(input, !flags.postgresConnection);
+    const recordStream = await TransformRecords(input);
     if (flags.postgresConnection) {
       const db = new Database(flags.postgresConnection, flags.development);
 
@@ -28,7 +28,7 @@ class CSVCommand extends Command {
         pipe(db.initAsyncUpserter());
     } else {
       var stringifier = csv.stringify({
-        header: !flags.batch,
+        header: !flags.noOutputHeader,
         parallel: 1,
         columns: [
           "source_system",
@@ -40,27 +40,12 @@ class CSVCommand extends Command {
         ],
       });
 
-      var output = null;
-      if (args.outputFile) {
-        output = createWriteStream(args.outputFile);
-      } else {
-        output = process.stdout;
-      }
-
-      var formatter = new Transform({
-        objectMode: true,
-        async transform(record, _, next) {
-          if (record[6] == true) {
-            next();
-            return
-          }
-
-          return next(null, formatOutputRow(record));
-        },
-      });
+      var output = args.outputFile
+        ? createWriteStream(args.outputFile)
+        : process.stdout;
 
       recordStream.
-        pipe(formatter).
+        pipe(outputRowProcessor()).
         pipe(stringifier).
         pipe(output);
     }
@@ -77,16 +62,28 @@ CSVCommand.args = [
 
 CSVCommand.flags = {
   postgresConnection: flags.string({char: 'p', env: "POSTGRES_CONNECTION_STRING", description: 'Postgres connection URI', required: false}),
-  batch: flags.boolean({char: 'b', env: "BATCH", description: 'batch mode', default: true}),
+  noOutputHeader: flags.boolean({char: 'n', description: 'omit the header row from output', default: true}),
   development: flags.boolean({char: 'd', env: "DEVELOPMENT", description: 'development mode', default: true}),
 }
 
 module.exports = CSVCommand
 
-function formatOutputRow(record) {
-          // cut off the first and last entry
-          // then combine the new first entry with the one we cut off
-  var formatted = record.slice(1, record.length-1);
-  formatted[0] = `${record[0]}|${formatted[0]}`;
-  return formatted;
+function outputRowProcessor() {
+  return new Transform({
+    objectMode: true,
+    async transform(object, _, next) {
+      if (object.isTransfer) {
+        next();
+        return
+      }
+
+      return next(null, [
+        `${object.sourceSystem}|${object.sourceSystemId}`,
+        object.merchant,
+        object.transactionDate,
+        -object.amount,
+        object.notes,
+      ]);
+    },
+  });
 }

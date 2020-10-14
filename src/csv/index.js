@@ -63,6 +63,7 @@ const adapterFactories = {
     return {
       classify: (row, i) => {
         if (row[2] == "Transfer") return "transfer"
+        if (row[3] == "VENMO") return "transfer"
   
         return "regular"
       },
@@ -166,10 +167,10 @@ function classifyFile(firstRow) {
 
 function normalizeDate(date) {
   var d = new Date(Date.parse(date));
-  return `${d.getMonth()}/${d.getDate()}/${d.getFullYear()}`
+  return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`
 }
 
-async function TransformRecords(input, outputRows = true) {
+async function TransformRecords(input) {
   var parser = csv.parse({
     skip_empty_lines: true,
     relax_column_count: true,
@@ -225,15 +226,6 @@ async function TransformRecords(input, outputRows = true) {
         // TODO once the processor is built, remove this _and_ add a whitelist to the database module
         isTransfer: transfer,
       };
-      if (outputRows) output = [
-        output.sourceSystem,
-        output.sourceSystemId,
-        output.merchant,
-        output.transactionDate,
-        output.amount,
-        output.notes,
-        output.isTransfer,
-      ];
       this.push(output);
       break;
     default:

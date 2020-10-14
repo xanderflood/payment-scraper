@@ -18,7 +18,7 @@ steps:
   image: plugins/docker
   settings:
     context: .
-    dockerfile: main.Dockerfile
+    dockerfile: dockerfiles/main.Dockerfile
     username:
       from_secret: docker_username
     password:
@@ -28,7 +28,7 @@ steps:
   image: plugins/docker
   settings:
     context: .
-    dockerfile: proton.Dockerfile
+    dockerfile: dockerfile/proton.Dockerfile
     username:
       from_secret: docker_username
     password:
