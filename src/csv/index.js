@@ -150,12 +150,6 @@ const adapterFactories = {
 };
 
 function classifyFile(firstRow) {
-  // console.log(firstRow, boaBankHeader)
-  // console.log(arrayEqual(firstRow, boaBankHeader))
-  // console.log(firstRow[0] == boaBankHeader[0])
-  // console.log(firstRow[1] == boaBankHeader[1])
-  // console.log(firstRow[2] == boaBankHeader[2])
-  // console.log(firstRow[3] == boaBankHeader[3])
   if (arrayEqual(firstRow, boaCreditHeader))
     return "boaCredit";
   if (arrayEqual(firstRow, boaBankHeader))
@@ -168,6 +162,11 @@ function classifyFile(firstRow) {
     return "capitalOne";
   if (firstRow[0] && firstRow[0].startsWith("Account Name : "))
     return "delta";
+}
+
+function normalizeDate(date) {
+  var d = new Date(Date.parse(date));
+  return `${d.getMonth()}/${d.getDate()}/${d.getFullYear()}`
 }
 
 async function TransformRecords(input, outputRows = true) {
@@ -216,7 +215,7 @@ async function TransformRecords(input, outputRows = true) {
         sourceSystemId: adapter.id(row),
         sourceSystemMeta: row,
 
-        transactionDate: adapter.date(row),
+        transactionDate: normalizeDate(adapter.date(row)),
         institution: adapter.institution(),
         merchant: adapter.merchant(row),
         amountString: adapter.amount(row),
@@ -233,7 +232,7 @@ async function TransformRecords(input, outputRows = true) {
         output.transactionDate,
         output.amount,
         output.notes,
-        output.isTransfer.toString(),
+        output.isTransfer,
       ];
       this.push(output);
       break;
