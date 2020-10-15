@@ -14,11 +14,23 @@ steps:
   - yarn install
   - yarn run eslint .
 
-- name: docker
+- name: docker-main
   image: plugins/docker
   settings:
+    context: .
+    dockerfile: dockerfiles/main.Dockerfile
     username:
       from_secret: docker_username
     password:
       from_secret: docker_password
     repo: xanderflood/payment-scraper
+- name: docker-proton
+  image: plugins/docker
+  settings:
+    context: .
+    dockerfile: dockerfiles/proton.Dockerfile
+    username:
+      from_secret: docker_username
+    password:
+      from_secret: docker_password
+    repo: xanderflood/payment-scraper-proton

@@ -5,6 +5,7 @@ const logger = new Logger();
 const Entities = require('html-entities').AllHtmlEntities;
 const entities = new Entities();
 const {markdownv2: tgmd} = require('telegram-format');
+var htmlToText = require('html-to-text');
 
 class UnrecognizedEmailError extends Error {}
 
@@ -261,6 +262,13 @@ async function scrapeOnce(
 					throw err
 				}
 
+				try {
+					body = htmlToText.fromString(body);
+				} catch (err) {
+					logger.error(`protonmail: failed to clean email body`, err)
+					throw err
+				}
+
 				var info;
 				try {
 					info = scrapeTransactionInfo(email, body);
@@ -288,6 +296,7 @@ async function scrapeOnce(
 							sourceSystemMeta: {
 								from: email.from.email,
 								subject: email.subject,
+								emailId: email.id,
 							},
 
 							transactionDate: info.transaction_date,

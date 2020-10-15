@@ -5,7 +5,6 @@ const cashAppHeader = ["Transaction ID", "Date", "Transaction Type", "Currency",
 const boaCreditHeader = ["Posted Date", "Reference Number", "Payee", "Address", "Amount"]
 const capitalOneHeader = ["Transaction Date", "Posted Date", "Card No.", "Description", "Category", "Debit", "Credit"]
 const boaBankHeader = ["Description", "", "Summary Amt."]      
-const deltaHeader = ["Transaction Number", "Date", "Description", "Memo", "Amount Debit", "Amount Credit", "Balance", "Check Number", "Fees ", "Principal "]
 
 class InvalidFormatError extends Error {}
 class InvalidRowClassificationError extends Error {}
@@ -20,13 +19,6 @@ const adapterFactories = {
   boaCredit: () => {
     return {
       classify: (row, i) => {
-        if (i == 0) {
-          if (!arrayEqual(row, boaCreditHeader)) {
-            throw new InvalidFormatError
-          }
-  
-          return "skip"
-        }
         if (row[2] == "PAYMENT - THANK YOU") return "transfer"
         if (row[2].startsWith("Square Inc DES:* Cash App")) return "transfer";
         if (row[2].startsWith("VENMO DES:CASHOUT")) return "transfer";
@@ -45,12 +37,6 @@ const adapterFactories = {
   boaBank: () => {
     return {
       classify: (row, i) => {
-        if (i == 0) {
-          if (!row[1].startsWith("Beginning balance as of")) {
-            throw new InvalidFormatError;
-          }
-          return "skip";
-        }
         if (row[1].startsWith("OVERDRAFT PROTECTION TO")) return "transfer";
         if (row[1].startsWith("Online Banking transfer")) return "transfer";
         if (row[1] == "BANK OF AMERICA CREDIT CARD Bill Payment") return "transfer";
@@ -76,13 +62,8 @@ const adapterFactories = {
   delta: () => {
     return {
       classify: (row, i) => {
-        if (i == 0) {
-          if (!arrayEqual(row, deltaHeader)) {
-            throw new InvalidFormatError
-          }
-          return "skip"
-        }
         if (row[2] == "Transfer") return "transfer"
+        if (row[3] == "VENMO") return "transfer"
   
         return "regular"
       },
@@ -97,7 +78,7 @@ const adapterFactories = {
       notes: (row, _) => row[2],
       merchant: (row, _) => row[3],
       institution: () => "delta",
-      skipRows: 3,
+      skipRows: 4,
     }
   },
   venmo: () => {
@@ -105,19 +86,11 @@ const adapterFactories = {
 
     return {
       classify: (row, i) => {
-        if (i == 0) {
-          if (!arrayEqual(row, venmoHeader)) {
-            throw new InvalidFormatError
-          }
-  
-          return "skip"
-        }
-        if (i == 1) {
+        if (row[0]) {
           username = row[0];
   
           return "skip"
         }
-        if (i == 2) return "skip"
         if (row[1] == "") return "skip"
         if (row[6] == "") return "transfer"
   
@@ -128,6 +101,7 @@ const adapterFactories = {
       date: (row, _) => row[2],
       notes: (row, _) => row[5],
       merchant: (row, _) => {
+        // TODO switch to a fuzzy match
         if (row[6].replace(/\ /g, "-") == username) {
           return "Venmo - "+row[7]
         }
@@ -139,13 +113,6 @@ const adapterFactories = {
   cashApp: () => {
     return {
       classify: (row, i) => {
-        if (i == 0) {
-          if (!arrayEqual(row, cashAppHeader)) {
-            throw new InvalidFormatError
-          }
-  
-          return "skip"
-        }
         if (row[9] == "TRANSFER SENT") return "transfer"
   
         return "regular"
@@ -161,13 +128,6 @@ const adapterFactories = {
   capitalOne: () => {
     return {
       classify: (row, i) => {
-        if (i == 0) {
-          if (!arrayEqual(row, capitalOneHeader)) {
-            throw new InvalidFormatError
-          }
-  
-          return "skip"
-        }
         if (row[4] == "Payment/Credit") return "transfer"
         if (row[3].startsWith("Square Inc DES:* Cash App")) return "transfer";
         if (row[3].startsWith("VENMO DES:CASHOUT")) return "transfer";
@@ -190,21 +150,62 @@ const adapterFactories = {
   },
 };
 
-function TransformRecords(input, mode, outputRows = true) {
-  var fct = adapterFactories[mode];
-  if (!fct) throw new UnrecognizedAdapterError
-  var adapter = fct();
+function classifyFile(firstRow) {
+  if (arrayEqual(firstRow, boaCreditHeader))
+    return "boaCredit";
+  if (arrayEqual(firstRow, boaBankHeader))
+    return "boaBank";
+  if (arrayEqual(firstRow, venmoHeader))
+    return "venmo";
+  if (arrayEqual(firstRow, cashAppHeader))
+    return "cashApp";
+  if (arrayEqual(firstRow, capitalOneHeader))
+    return "capitalOne";
+  if (firstRow[0] && firstRow[0].startsWith("Account Name : "))
+    return "delta";
+}
 
+function normalizeDate(date) {
+  var d = new Date(Date.parse(date));
+  return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`
+}
+
+async function TransformRecords(input) {
   var parser = csv.parse({
-    from_line: adapter.skipRows+1 || undefined,
     skip_empty_lines: true,
+    relax_column_count: true,
   });
 
-  var i = -1;
+  var lineOffset = -1;
+  var rowOffset = -1;
+  let mode;
+  let fct;
+  let adapter;
   var transformer = csv.transform({ parallel: 1 }, function(row) {
-    i++
+    lineOffset++;
+    if (!mode) {
+      if (lineOffset > 5)
+        throw new InvalidFormatError();
+      lineOffset++;
+
+      mode = classifyFile(row);
+      if (!mode)
+        return;
+
+      fct = adapterFactories[mode];
+      if (!fct) throw new UnrecognizedAdapterError;
+      adapter = fct();
+
+      return;
+    }
+
+    if (adapter.skipRows && lineOffset < adapter.skipRows + 1)
+      return;
+
+    rowOffset++;
     var transfer = false;
-    switch (adapter.classify(row, i)) {
+    val = adapter.classify(row, rowOffset)
+    switch (val) {
     case "skip":
       return
     case "transfer":
@@ -213,8 +214,9 @@ function TransformRecords(input, mode, outputRows = true) {
       var output = {
         sourceSystem: "csv|"+mode,
         sourceSystemId: adapter.id(row),
+        sourceSystemMeta: row,
 
-        transactionDate: adapter.date(row),
+        transactionDate: normalizeDate(adapter.date(row)),
         institution: adapter.institution(),
         merchant: adapter.merchant(row),
         amountString: adapter.amount(row),
@@ -224,15 +226,6 @@ function TransformRecords(input, mode, outputRows = true) {
         // TODO once the processor is built, remove this _and_ add a whitelist to the database module
         isTransfer: transfer,
       };
-      if (outputRows) output = [
-        output.sourceSystem,
-        output.sourceSystemId,
-        output.merchant,
-        output.transactionDate,
-        output.amount,
-        output.notes,
-        output.isTransfer.toString(),
-      ];
       this.push(output);
       break;
     default:
@@ -241,7 +234,7 @@ function TransformRecords(input, mode, outputRows = true) {
   });
 
   return input.pipe(parser)
-    .pipe(transformer)
+    .pipe(transformer);
 }
 
-module.exports = { TransformRecords, modes: Object.keys(adapterFactories) };
+module.exports = { TransformRecords };

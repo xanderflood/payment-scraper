@@ -1,10 +1,10 @@
 const { Command, flags } = require('@oclif/command')
 const { Database } = require ('../database');
 const protonmail = require('../protonmail');
-const { TransformRecords, modes } = require('../csv')
+const { TransformRecords } = require('../csv')
 const csv = require('csv');
 const { createReadStream, createWriteStream } = require('fs');
-const { Transform } = require('stream-transform');
+const { Transform } = require('stream');
 
 const Logger = require('node-json-logger');
 const logger = new Logger();
@@ -18,17 +18,17 @@ class CSVCommand extends Command {
       input = createReadStream(args.inputFile);
     }
 
-    const db = new Database(flags.postgresConnection, flags.development);
-
-    const recordStream = TransformRecords(input, args.mode, !flags.postgresConnection);
+    const recordStream = await TransformRecords(input);
     if (flags.postgresConnection) {
+      const db = new Database(flags.postgresConnection, flags.development);
+
       await db.initialize();
 
       recordStream.
         pipe(db.initAsyncUpserter());
     } else {
       var stringifier = csv.stringify({
-        header: true,
+        header: !flags.noOutputHeader,
         parallel: 1,
         columns: [
           "source_system",
@@ -37,18 +37,15 @@ class CSVCommand extends Command {
           "transaction_date",
           "amount",
           "notes",
-          "transfer",
         ],
       });
 
-      var output = null;
-      if (args.outputFile) {
-        output = createWriteStream(args.outputFile);
-      } else {
-        output = process.stdout;
-      }
+      var output = args.outputFile
+        ? createWriteStream(args.outputFile)
+        : process.stdout;
 
       recordStream.
+        pipe(outputRowProcessor()).
         pipe(stringifier).
         pipe(output);
     }
@@ -59,14 +56,34 @@ CSVCommand.description = `Start the protonmail email scanning agent
 `
 
 CSVCommand.args = [
-  {name: "mode", required: true}, // TODO , options: [ modes ]},
   {name: "inputFile", required: true},
   {name: "outputFile"},
 ]
 
 CSVCommand.flags = {
   postgresConnection: flags.string({char: 'p', env: "POSTGRES_CONNECTION_STRING", description: 'Postgres connection URI', required: false}),
+  noOutputHeader: flags.boolean({char: 'n', description: 'omit the header row from output', default: true}),
   development: flags.boolean({char: 'd', env: "DEVELOPMENT", description: 'development mode', default: true}),
 }
 
 module.exports = CSVCommand
+
+function outputRowProcessor() {
+  return new Transform({
+    objectMode: true,
+    async transform(object, _, next) {
+      if (object.isTransfer) {
+        next();
+        return
+      }
+
+      return next(null, [
+        `${object.sourceSystem}|${object.sourceSystemId}`,
+        object.merchant,
+        object.transactionDate,
+        -object.amount,
+        object.notes,
+      ]);
+    },
+  });
+}
