@@ -223,7 +223,6 @@ async function TransformRecords(input) {
         amount: parseFloat(adapter.amount(row).replace(/[\$\s,]/g,"")),
         notes: adapter.notes(row),
 
-        // TODO once the processor is built, remove this _and_ add a whitelist to the database module
         isTransfer: transfer,
       };
       this.push(output);

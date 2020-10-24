@@ -1,6 +1,5 @@
 const { Command, flags } = require('@oclif/command')
 const { Database } = require ('../database');
-const protonmail = require('../protonmail');
 const { TransformRecords } = require('../csv')
 const csv = require('csv');
 const { createReadStream, createWriteStream } = require('fs');
@@ -22,10 +21,8 @@ class CSVCommand extends Command {
     if (flags.postgresConnection) {
       const db = new Database(flags.postgresConnection, flags.development);
 
-      await db.initialize();
-
       recordStream.
-        pipe(db.initAsyncUpserter());
+        pipe(db.initAsyncTransactionUpserter());
     } else {
       var stringifier = csv.stringify({
         header: !flags.noOutputHeader,
@@ -52,7 +49,7 @@ class CSVCommand extends Command {
   }
 }
 
-CSVCommand.description = `Start the protonmail email scanning agent
+CSVCommand.description = `Ingest or process a CSV file
 `
 
 CSVCommand.args = [

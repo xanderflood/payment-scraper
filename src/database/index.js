@@ -1,10 +1,31 @@
-const { Sequelize, Model, DataTypes } = require('sequelize');
+const { Sequelize, Model, DataTypes, Op } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
 const { Transform } = require('stream');
 const crypto = require('crypto');
 
+const Logger = require('node-json-logger');
+const logger = new Logger();
+
+const numericEqualityThreshold = 0.01
+
 class Transaction extends Model {}
 class Category extends Model {}
+class CategoryRule extends Model {
+	apply(transaction) {
+		return this.match(transaction) ? this.categoryId : undefined;
+	}
+
+	match(transaction) {
+		switch (this.type) {
+		case "regex":
+			return !!(transaction[this.field].match(new RegExp(this.string)));
+		case "numeric":
+			return Math.abs(this.number - transaction[this.field]) < numericEqualityThreshold;
+		default:
+			return false;
+		}
+	}
+}
 
 class RecordNotFoundError extends Error {
   constructor(type, id) {
@@ -27,6 +48,16 @@ class Database {
 			name: { type: Sequelize.STRING, unique: true, allowNull: false },
 			slug: { type: Sequelize.STRING, unique: true, allowNull: false },
 		}, { sequelize, modelName: 'category' });
+
+		CategoryRule.init({
+			id: { type: Sequelize.UUID, primaryKey: true },
+			categoryId: { type: Sequelize.UUID, references: { model: Category, key: 'id' } },
+
+			field:  { type: Sequelize.STRING, isIn: [["merchant", "notes", "amount"]] },
+			type:   { type: Sequelize.STRING, isIn: [["regex", "numeric"]] },
+			string: { type: Sequelize.STRING, allowNull: true },
+			number: { type: Sequelize.DOUBLE, allowNull: true },
+		}, { sequelize, modelName: 'categoryRule' });
 
 		Transaction.init({
 			id:      { type: Sequelize.UUID, primaryKey: true },
@@ -54,7 +85,18 @@ class Database {
 			systemNotes:         { type: Sequelize.STRING },
 
 			categoryId: { type: Sequelize.UUID, references: { model: Category, key: 'id' } },
-		}, { sequelize, modelName: 'transaction' });
+		}, {
+			sequelize,
+			modelName: 'transaction',
+			indexes: [
+				{
+					unique: true,
+					name: "transactionSourceSystem",
+					fields: ["sourceSystem", "sourceSystemId"],
+					where: { sourceSystemId: { [Op.not]: null } },
+				},
+			],
+		});
 
 		Transaction.beforeCreate(async (tr, options) => {
 			tr.id = uuidv4();
@@ -64,11 +106,18 @@ class Database {
 				.update(JSON.stringify(tr.sourceSystemMeta))
 				.digest("hex");
 		});
+		Category.beforeCreate(async (tr, options) => {
+			tr.id = uuidv4();
+		});
+		CategoryRule.beforeCreate(async (tr, options) => {
+			tr.id = uuidv4();
+		});
 	}
 
 	async initialize() {
 		await Category.sync({ force: this.development });
 		await Transaction.sync({ force: this.development });
+		await CategoryRule.sync({ force: this.development });
 	}
 
 	async getCategories() {
@@ -80,59 +129,116 @@ class Database {
 	async addCategory(attrs) {
 		return await Category.create(attrs);
 	}
-	async categorizeTransaction(trShortId, catSlug, notes="") {
-		// allow full UUIDs as well
-		trShortId = trShortId.slice(0, 5);
-		catSlug = catSlug.slice(0, 5);
+	// async categorizeTransaction(trShortId, catSlug, notes="") {
+	// 	// allow full UUIDs as well
+	// 	trShortId = trShortId.slice(0, 5);
+	// 	catSlug = catSlug.slice(0, 5);
 
-		var cats = Category.findAll({ where: { slug: catSlug } });
-		if (cats.length < 1) throw new RecordNotFoundError("category", catSlug);
+	// 	var cats = await Category.findAll({ where: { slug: catSlug } });
+	// 	if (cats.length < 1) throw new RecordNotFoundError("category", catSlug);
 
-		var transactions = await Transaction.update(
-			{ categoryId: cats[0].id, notes: notes },
-			{ where: { shortId: trShortId } },
-		)
-		if (transactions.length < 1) throw new RecordNotFoundError("transaction", trShortId);
-		return transactions[0];
+	// 	var transactions = await Transaction.update(
+	// 		{ categoryId: cats[0].id, notes: notes },
+	// 		{ where: { shortId: trShortId } },
+	// 	)
+	// 	if (transactions.length < 1) throw new RecordNotFoundError("transaction", trShortId);
+	// 	return transactions[0];
+	// }
+	async getTransactionBySourceSystemId(sourceSystem, sourceSystemId) {
+		var identifiers = { sourceSystem: sourceSystem, sourceSystemId: sourceSystemId }
+		return await Transaction.findAll({ where: identifiers, });
 	}
 	async createTransaction(attrs) {
 		var whitelistedFields = (({sourceSystem, sourceSystemId, sourceSystemMeta, transactionDate, institution, merchant, amountString, amount, notes}) =>
 			({sourceSystem, sourceSystemId, sourceSystemMeta, transactionDate, institution, merchant, amountString, amount, notes}))(attrs);
 
-		return await Transaction.create(attrs);
+		try {
+			return await Transaction.create(attrs);
+		} catch(e) {
+			if (e.name = 'SequelizeUniqueConstraintError') {
+				logger.info('skipping duplicate source system identifier');
+			}
+
+			return false;
+		}
 	}
-	async saveTransactionProcessingResult(trShortId, update) {
-		trShortId = trShortId.slice(0, 5);
+	async saveTransactionProcessingResult(trId, update) {
+		let catId;
+		if (update.catSlug) {
+			var cats = await Category.findAll({ zwhere: { slug: update.catSlug } });
+			if (cats.length < 1) throw new RecordNotFoundError("category", update.catSlug);
+			catId = cats[0].id;
+		}
 
-		var cats = Category.findAll({ where: { slug: update.catSlug } });
-		if (cats.length < 1) throw new RecordNotFoundError("category", catSlug);
-
-		var whitelistedFields = (({isTransfer, isRefunded, isPossibleDuplicate, systemNotes}) =>
-			({isTransfer, isRefunded, isPossibleDuplicate, systemNotes}))(update);
+		var whitelistedFields = (({categoryId, isTransfer, isRefunded, isPossibleDuplicate, systemNotes}) =>
+			({categoryId, isTransfer, isRefunded, isPossibleDuplicate, systemNotes}))(update);
 
 		var transactions = await Transaction.update(
 			{	isProcessed: true,
+				categoryId: catId,
 				...whitelistedFields
 			},
-			{ where: { shortId: trShortId } },
+			{ where: { id: trId } },
 		);
 		if (transactions.length < 1) throw new RecordNotFoundError("transaction", trShortId);
 
 		return transactions[0];
 	}
 
-	initAsyncUpserter() {
+	async saveRule(params) {
+		var cats = await Category.findAll({ where: { slug: params.catSlug } });
+		if (cats.length < 1) throw new RecordNotFoundError("category", params.catSlug);
+
+		var whitelistedFields = (({field, type, string, number}) =>
+			({field, type, string, number}))(params);
+
+		return await CategoryRule.create(
+			{	categoryId: cats[0].id,
+				...whitelistedFields
+			});
+	}
+
+	async saveCat(params) {
+		var whitelistedFields = (({name, slug}) =>
+			({name, slug}))(params);
+
+		return await Category.create(whitelistedFields);
+	}
+
+	async getRules() {
+		return await CategoryRule.findAll();
+	}
+
+	initAsyncTransactionUpserter() {
+		var _this = this;
 		return new Transform({
 			objectMode: true,
 			async transform(record, _, next) {
-				await database.createTransaction(record);
+				await _this.createTransaction(record);
 				next(null, record);
 			},
 		});
 	}
-
-	// TODO disable this in dev mode
-	// async unProcessAllTransactions() {}
+	initAsyncRuleUpserter() {
+		var _this = this;
+		return new Transform({
+			objectMode: true,
+			async transform(record, _, next) {
+				await _this.saveRule(record);
+				next(null, record);
+			},
+		});
+	}
+	initAsyncCatUpserter() {
+		var _this = this;
+		return new Transform({
+			objectMode: true,
+			async transform(record, _, next) {
+				await _this.saveCat(record);
+				next(null, record);
+			},
+		});
+	}
 }
 
 module.exports = { Database, RecordNotFoundError }
