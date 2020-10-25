@@ -1,6 +1,6 @@
 const { Command, flags } = require('@oclif/command')
 const { Database } = require ('../database');
-const { TransformRecords } = require('../csv')
+const { TransactionParser } = require('../csv')
 const csv = require('csv');
 const { createReadStream, createWriteStream } = require('fs');
 const { Transform } = require('stream');
@@ -17,14 +17,24 @@ class CSVCommand extends Command {
       input = createReadStream(args.inputFile);
     }
 
-    const recordStream = await TransformRecords(input);
+    const csvParser = csv.parse({
+      skip_empty_lines: true,
+      relax_column_count: true,
+    });
+
+    const transactionParser = new TransactionParser();
+
+    const records = input
+      .pipe(csvParser)
+      .pipe(transactionParser);
+
     if (flags.postgresConnection) {
       const db = new Database(flags.postgresConnection, flags.development);
 
-      recordStream.
+      records.
         pipe(db.initAsyncTransactionUpserter());
     } else {
-      var stringifier = csv.stringify({
+      const stringifier = csv.stringify({
         header: !flags.noOutputHeader,
         parallel: 1,
         columns: [
@@ -37,11 +47,11 @@ class CSVCommand extends Command {
         ],
       });
 
-      var output = args.outputFile
+      const output = args.outputFile
         ? createWriteStream(args.outputFile)
         : process.stdout;
 
-      recordStream.
+      records.
         pipe(outputRowProcessor()).
         pipe(stringifier).
         pipe(output);

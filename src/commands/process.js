@@ -13,10 +13,21 @@ class ProcessCommand extends Command {
     const processor = new Processor(db);
     await processor.initialize();
 
-    let trs = await db.getUnprocessedTransactions(); /* TODO .catch() */
+    try {
+      let trs = await db.getUnprocessedTransactions();
+    } catch (e) {
+      logger.error(e);
+      return;
+    }
+
     for (var i = trs.length - 1; i >= 0; i--) {
-      let update = processor.processTransaction(trs[i]);
-      await db.saveTransactionProcessingResult(trs[i].id, update); /* TODO .catch() */
+      try {
+        let update = await processor.processTransaction(trs[i]);
+        await db.saveTransactionProcessingResult(trs[i].id, update); /* TODO .catch() */
+      } catch (e) {
+        logger.error(e);
+        return;
+      }
     }
   }
 }

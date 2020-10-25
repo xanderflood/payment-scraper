@@ -1,4 +1,4 @@
-const { Sequelize, Model, DataTypes, Op } = require('sequelize');
+const { Sequelize, Model, Op } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
 const { Transform } = require('stream');
 const crypto = require('crypto');
@@ -92,7 +92,7 @@ class Database {
 				{
 					unique: true,
 					name: "transactionSourceSystem",
-					fields: ["sourceSystem", "sourceSystemId"],
+					fields: ["sourceSystem", "sourceSystemId", "transactionDate"],
 					where: { sourceSystemId: { [Op.not]: null } },
 				},
 			],
@@ -155,10 +155,11 @@ class Database {
 		try {
 			return await Transaction.create(attrs);
 		} catch(e) {
-			if (e.name = 'SequelizeUniqueConstraintError') {
+			if (e.name == 'SequelizeUniqueConstraintError') {
 				logger.info('skipping duplicate source system identifier');
+			} else {
+				logger.error(e);
 			}
-
 			return false;
 		}
 	}
