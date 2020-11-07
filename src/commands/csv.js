@@ -3,7 +3,7 @@ const { Database } = require ('../database');
 const { TransactionParser } = require('../csv')
 const csv = require('csv');
 const { createReadStream, createWriteStream } = require('fs');
-const { Transform } = require('stream');
+const { Transform, Writable } = require('stream');
 
 const Logger = require('node-json-logger');
 const logger = new Logger();
@@ -28,11 +28,24 @@ class CSVCommand extends Command {
       .pipe(csvParser)
       .pipe(transactionParser);
 
+    var pipeline;
     if (flags.postgresConnection) {
       const db = new Database(flags.postgresConnection, flags.development);
+      var upserter = new Writable({
+        objectMode: true,
+        async write(record, _, next) {
+          try {
+            await db.createTransaction(record);
+            next();
+          } catch (e) {
+            next(e);
+          }
+        },
+      });
 
-      records.
-        pipe(db.initAsyncTransactionUpserter());
+      pipeline = records.
+        pipe(upserter).
+        on('close', db.close);
     } else {
       const stringifier = csv.stringify({
         header: !flags.noOutputHeader,
@@ -51,11 +64,14 @@ class CSVCommand extends Command {
         ? createWriteStream(args.outputFile)
         : process.stdout;
 
-      records.
+      pipeline = records.
         pipe(outputRowProcessor()).
         pipe(stringifier).
         pipe(output);
     }
+
+    pipeline.
+      on('error', (e) => logger.error("upsert failed:", e.message));
   }
 }
 
@@ -85,7 +101,7 @@ function outputRowProcessor() {
       }
 
       return next(null, [
-        `${object.sourceSystem}|${object.sourceSystemId}`,
+        `${object.sourceSystem}|${object.sourceSystemId || ""}`,
         object.merchant,
         object.transactionDate,
         -object.amount,

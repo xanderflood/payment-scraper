@@ -2,6 +2,7 @@ const { Command, flags } = require('@oclif/command')
 const { Database } = require ('../database');
 const csv = require('csv');
 const { createReadStream } = require('fs');
+const { Writable } = require('stream');
 
 const Logger = require('node-json-logger');
 const logger = new Logger();
@@ -21,18 +22,31 @@ class LoadRulesCommand extends Command {
 
     var transformer = csv.transform({ parallel: 1 }, function(row) {
       return {
-        catSlug: row[0],
+        type:    row[0],
         field:   row[1],
-        type:    row[2],
-        string:  row[2] == "regex" ? row[3] : null,
-        number:  row[2] == "numeric" ? parseFloat(row[3]) : null,
+        catSlug: row[2],
+        string:  row[0] == "regex" ? row[3] : null,
+        number:  row[0] == "numeric" ? parseFloat(row[3]) : null,
       };
+    });
+    var upserter = new Writable({
+      objectMode: true,
+      async write(record, _, next) {
+        try {
+          await db.saveRule(record);
+          next();
+        } catch (e) {
+          next(e);
+        }
+      },
     });
 
     input.
       pipe(parser).
       pipe(transformer).
-      pipe(db.initAsyncRuleUpserter());
+      pipe(upserter).
+      on('close', db.close).
+      on('error', (e) => logger.error("upsert failed:", e.message));
   }
 }
 

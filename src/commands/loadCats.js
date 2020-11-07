@@ -2,6 +2,7 @@ const { Command, flags } = require('@oclif/command')
 const { Database } = require ('../database');
 const csv = require('csv');
 const { createReadStream } = require('fs');
+const { Writable } = require('stream');
 
 const Logger = require('node-json-logger');
 const logger = new Logger();
@@ -25,11 +26,24 @@ class LoadCatsCommand extends Command {
         slug: row[1],
       };
     });
+    var upserter = new Writable({
+      objectMode: true,
+      async write(record, _, next) {
+        try {
+          await db.saveCat(record);
+          next();
+        } catch (e) {
+          next(e);
+        }
+      },
+    });
 
     input.
       pipe(parser).
       pipe(transformer).
-      pipe(db.initAsyncCatUpserter());
+      pipe(upserter).
+      on('close', db.close).
+      on('error', (e) => logger.error("upsert failed:", e.message));
   }
 }
 

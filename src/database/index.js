@@ -18,7 +18,7 @@ class CategoryRule extends Model {
 	match(transaction) {
 		switch (this.type) {
 		case "regex":
-			return !!(transaction[this.field].match(new RegExp(this.string)));
+			return !!(transaction[this.field].match(new RegExp(this.string), "i"));
 		case "numeric":
 			return Math.abs(this.number - transaction[this.field]) < numericEqualityThreshold;
 		default:
@@ -51,49 +51,49 @@ class Database {
 
 		CategoryRule.init({
 			id: { type: Sequelize.UUID, primaryKey: true },
-			categoryId: { type: Sequelize.UUID, references: { model: Category, key: 'id' } },
+			categoryId: { type: Sequelize.UUID, references: { model: Category, key: 'id' }, field: "category_id" },
 
 			field:  { type: Sequelize.STRING, isIn: [["merchant", "notes", "amount"]] },
 			type:   { type: Sequelize.STRING, isIn: [["regex", "numeric"]] },
 			string: { type: Sequelize.STRING, allowNull: true },
 			number: { type: Sequelize.DOUBLE, allowNull: true },
-		}, { sequelize, modelName: 'categoryRule' });
+		}, { sequelize, modelName: 'categoryRule', tableName: "category_rule" });
 
 		Transaction.init({
 			id:      { type: Sequelize.UUID, primaryKey: true },
 			shortId: { type: Sequelize.STRING, unique: true },
 
 			// scraper metadata
-			sourceSystem:       { type: Sequelize.STRING },
-			sourceSystemId:     { type: Sequelize.STRING },
-			sourceSystemMeta:   { type: Sequelize.JSONB },
-			sourceSystemDigest: { type: Sequelize.STRING },
+			sourceSystem:       { type: Sequelize.STRING, field: "source_system" },
+			sourceSystemId:     { type: Sequelize.STRING, field: "source_system_id" },
+			sourceSystemMeta:   { type: Sequelize.JSONB, field: "source_system_meta" },
+			sourceSystemDigest: { type: Sequelize.STRING, field: "source_system_digest" },
 
 			// inferred fields
-			transactionDate: { type: Sequelize.DATE, allowNull: false },
+			transactionDate: { type: Sequelize.DATE, allowNull: false, field: "transaction_date" },
 			institution:     { type: Sequelize.STRING, allowNull: false },
 			merchant:        { type: Sequelize.STRING, allowNull: false },
-			amountString:    { type: Sequelize.STRING, allowNull: false },
+			amountString:    { type: Sequelize.STRING, allowNull: false, field: "amount_string" },
 			amount:          { type: Sequelize.DOUBLE, allowNull: false },
 			notes:           { type: Sequelize.STRING },
 
 			// manual fields
-			isTransfer:          { type: Sequelize.BOOLEAN, defaultValue: false, allowNull: false },
-			isRefunded:          { type: Sequelize.BOOLEAN, defaultValue: false, allowNull: false },
-			isPossibleDuplicate: { type: Sequelize.BOOLEAN, defaultValue: false, allowNull: false },
-			isProcessed:         { type: Sequelize.BOOLEAN, defaultValue: false, allowNull: false },
-			systemNotes:         { type: Sequelize.STRING },
+			isTransfer:          { type: Sequelize.BOOLEAN, defaultValue: false, allowNull: false, field: "is_transfer" },
+			isRefunded:          { type: Sequelize.BOOLEAN, defaultValue: false, allowNull: false, field: "is_refunded" },
+			isPossibleDuplicate: { type: Sequelize.BOOLEAN, defaultValue: false, allowNull: false, field: "is_possible_duplicate" },
+			isProcessed:         { type: Sequelize.BOOLEAN, defaultValue: false, allowNull: false, field: "is_processed" },
+			systemNotes:         { type: Sequelize.STRING, field: "system_notes" },
 
-			categoryId: { type: Sequelize.UUID, references: { model: Category, key: 'id' } },
+			categoryId: { type: Sequelize.UUID, references: { model: Category, key: 'id' }, field: "category_id" },
 		}, {
 			sequelize,
 			modelName: 'transaction',
 			indexes: [
 				{
 					unique: true,
-					name: "transactionSourceSystem",
-					fields: ["sourceSystem", "sourceSystemId", "transactionDate"],
-					where: { sourceSystemId: { [Op.not]: null } },
+					name: "transaction_source_system",
+					fields: ["source_system", "source_system_id", "transaction_date"],
+					where: { "source_system_id": { [Op.not]: null } },
 				},
 			],
 		});
@@ -112,6 +112,10 @@ class Database {
 		CategoryRule.beforeCreate(async (tr, options) => {
 			tr.id = uuidv4();
 		});
+	}
+
+	async close() {
+		await sequelize.close()
 	}
 
 	async initialize() {
@@ -208,37 +212,6 @@ class Database {
 
 	async getRules() {
 		return await CategoryRule.findAll();
-	}
-
-	initAsyncTransactionUpserter() {
-		var _this = this;
-		return new Transform({
-			objectMode: true,
-			async transform(record, _, next) {
-				await _this.createTransaction(record);
-				next(null, record);
-			},
-		});
-	}
-	initAsyncRuleUpserter() {
-		var _this = this;
-		return new Transform({
-			objectMode: true,
-			async transform(record, _, next) {
-				await _this.saveRule(record);
-				next(null, record);
-			},
-		});
-	}
-	initAsyncCatUpserter() {
-		var _this = this;
-		return new Transform({
-			objectMode: true,
-			async transform(record, _, next) {
-				await _this.saveCat(record);
-				next(null, record);
-			},
-		});
 	}
 }
 

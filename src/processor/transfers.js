@@ -1,9 +1,9 @@
 const {matches, equals, isEqualTo, startsWith, isCSVSource, csvSourceEntry, and} = require('./utils');
 
 const StandardTransferIdentifiers = [
-	and(startsWith("merchant", "Square Inc DES:* Cash App")),
-	and(startsWith("merchant", "VENMO DES:CASHOUT")),
-	and(startsWith("merchant", "VENMO DES:PAYMENT")),
+	startsWith("merchant", "Square Inc DES:* Cash App"),
+	startsWith("merchant", "VENMO DES:CASHOUT"),
+	startsWith("merchant", "VENMO DES:PAYMENT"),
 
 	and(isCSVSource("boaCredit"), equals("merchant", "PAYMENT - THANK YOU")),
 
