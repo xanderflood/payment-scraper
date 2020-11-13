@@ -61,7 +61,7 @@ class Database {
 
 		Transaction.init({
 			id:      { type: Sequelize.UUID, primaryKey: true },
-			shortId: { type: Sequelize.STRING, unique: true },
+			shortId: { type: Sequelize.STRING, unique: true, field: "short_id" },
 
 			// scraper metadata
 			sourceSystem:       { type: Sequelize.STRING, field: "source_system" },

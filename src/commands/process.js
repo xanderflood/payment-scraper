@@ -24,7 +24,9 @@ class ProcessCommand extends Command {
     for (var i = trs.length - 1; i >= 0; i--) {
       try {
         let update = await processor.processTransaction(trs[i]);
-        await db.saveTransactionProcessingResult(trs[i].id, update);
+
+        if (Object.keys(update).length)
+          await db.saveTransactionProcessingResult(trs[i].id, update);
       } catch (e) {
         logger.error(`failed processing transaction: ${e.message}`, e);
         return;
