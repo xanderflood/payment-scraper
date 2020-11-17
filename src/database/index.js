@@ -8,6 +8,24 @@ const logger = new Logger();
 
 const numericEqualityThreshold = 0.01
 
+const unprocessedTransactionsViewQuery = `
+CREATE OR replace VIEW unprocessed_transactions AS
+	SELECT transaction_date, merchant, amount, notes
+		FROM transactions
+		WHERE NOT is_processed
+		ORDER BY transaction_date DESC;
+`;
+
+const monthlyTotalsViewQuery = `
+CREATE OR replace VIEW monthly_totals AS
+	SELECT EXTRACT(year FROM transaction_date) AS year, EXTRACT(month FROM transaction_date) AS month, cat.name AS cat_name, SUM(tr.amount) AS total
+		FROM transactions AS tr
+		LEFT JOIN categories AS cat
+			ON cat.id = tr.category_id
+		GROUP BY EXTRACT(year FROM transaction_date), EXTRACT(month FROM transaction_date), cat.id, cat.name
+		ORDER BY EXTRACT(year FROM transaction_date), EXTRACT(month FROM transaction_date), cat.id;
+`;
+
 class Transaction extends Model {}
 class Category extends Model {}
 class CategoryRule extends Model {
@@ -42,6 +60,7 @@ class Database {
 		this.development = development;
 
 		const sequelize = new Sequelize(connectionURL, { logging: false });
+		this.sequelize = sequelize;
 
 		Category.init({
 			id: { type: Sequelize.UUID, primaryKey: true },
@@ -119,9 +138,38 @@ class Database {
 	}
 
 	async initialize() {
-		await Category.sync({ force: this.development });
-		await Transaction.sync({ force: this.development });
-		await CategoryRule.sync({ force: this.development });
+		try {
+			await Category.sync({ alter: true, force: this.development });
+		} catch (error) {
+			logger.error(error);
+			throw error;
+		}
+		try {
+			await Transaction.sync({ alter: true, force: this.development });
+		} catch (error) {
+			logger.error(error);
+			throw error;
+		}
+		try {
+			await CategoryRule.sync({ alter: true, force: this.development });
+		} catch (error) {
+			logger.error(error);
+			throw error;
+		}
+
+		try {
+			await this.sequelize.query(unprocessedTransactionsViewQuery);
+		} catch (error) {
+			logger.error(error);
+			throw error;
+		}
+
+		try {
+			await this.sequelize.query(monthlyTotalsViewQuery);
+		} catch (error) {
+			logger.error(error);
+			throw error;
+		}
 	}
 
 	async getCategories() {

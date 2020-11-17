@@ -18,6 +18,7 @@ class PGInitCommand extends Command {
       await db.initialize();
     } catch (e) {
       logger.error(e);
+      return;
     }
   }
 }
