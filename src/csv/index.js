@@ -1,4 +1,5 @@
-var csv = require('csv');
+const csv = require('csv');
+const { Transform } = require('stream');
 
 const venmoHeader = ["Username", "ID", "Datetime", "Type", "Status", "Note", "From", "To", "Amount (total)", "Amount (fee)", "Funding Source", "Destination", "Beginning Balance", "Ending Balance", "Statement Period Venmo Fees", "Terminal Location", "Year to Date Venmo Fees", "Disclaimer"];
 const cashAppHeader = ["Transaction ID", "Date", "Transaction Type", "Currency", "Amount", "Fee", "Net Amount", "Asset Type", "Asset Price", "Asset Amount", "Status", "Notes", "Name of sender/receiver", "Account"];
@@ -50,7 +51,6 @@ const adapterFactories = {
 
         return "regular";
       },
-      id: (row, _) => "",
       amount: (row, _) => row[2],
       date: (row, _) => row[0],
       notes: (row, _) => "",
@@ -101,7 +101,6 @@ const adapterFactories = {
       date: (row, _) => row[2],
       notes: (row, _) => row[5],
       merchant: (row, _) => {
-        // TODO switch to a fuzzy match
         if (row[6].replace(/\ /g, "-") == username) {
           return "Venmo - "+row[7]
         }
@@ -119,7 +118,7 @@ const adapterFactories = {
       },
       id: (row, _) => row[0],
       amount: (row, _) => row[6],
-      date: (row, _) => row[1].replace(/\ /g, "T"),
+      date: (row, _) => row[1],
       merchant: (row, _) => "CashApp - "+row[12],
       notes: (row, _) => row[11],
       institution: () => "CashApp",
@@ -135,7 +134,6 @@ const adapterFactories = {
 
         return "regular"
       },
-      id: (row, _) => "",
       amount: (row, _) => {
         if (row[5].length != 0) {
           return "-"+row[5]
@@ -168,6 +166,112 @@ function classifyFile(firstRow) {
 function normalizeDate(date) {
   var d = new Date(Date.parse(date));
   return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`
+}
+
+class TransactionParser extends Transform {
+  constructor(options) {
+    super({ objectMode: true });
+
+    if (options) {
+      if (typeof options.mode == 'string')
+        this.mode = options.mode;
+    }
+
+    this.lineOffset = -1;
+    this.rowOffset = -1;
+
+    this._transactions = {};
+  }
+
+  _transform(row, encoding, callback) {
+    this.lineOffset++;
+
+    // see if we have enough information to initialize the adapter
+    if (!this.adapter) {
+      if (!this.mode) {
+        // give up if we can't choose an adapter within 5 lines
+        if (this.lineOffset > 5)
+          callback(new InvalidFormatError());
+
+        this.lineOffset++;
+
+        this.mode = classifyFile(row);
+        if (!this.mode) {
+          callback();
+          return;
+        }
+      }
+
+      var fct = adapterFactories[this.mode];
+      if (!fct) callback(new UnrecognizedAdapterError);
+      this.adapter = fct();
+      this.skipRows = (this.adapter.skipRows + 1) || 2;
+      this.idFunc = this.adapter.id ? this.adapter.id : () => null;
+      this.deferUpserts = !!this.adapter.id;
+    }
+
+    // some adapters need us to skip more rows than are required to identify the mode
+    if (this.lineOffset < this.skipRows) {
+      callback();
+      return;
+    }
+
+    this.rowOffset++;
+    var transfer = false;
+    var val = this.adapter.classify(row, this.rowOffset)
+    switch (val) {
+    case "skip":
+      callback();
+      return;
+    case "transfer":
+      transfer = true;
+    case "regular":
+      var output = {
+        sourceSystem: "csv|"+this.mode,
+        sourceSystemId: this.idFunc(row),
+        sourceSystemMeta: [row],
+
+        transactionDate: normalizeDate(this.adapter.date(row)),
+        institution: this.adapter.institution(),
+        merchant: this.adapter.merchant(row),
+        amountString: this.adapter.amount(row),
+        amount: parseFloat(this.adapter.amount(row).replace(/[\$\s,]/g,"")),
+        notes: this.adapter.notes(row),
+
+        isTransfer: transfer,
+      };
+
+      if (!this.deferUpserts) {
+        this.push(output);
+      } else {
+        const key = `${output.sourceSystem}|${output.sourceSystemId}|${output.transactionDate}`;
+        if (!this._transactions[key]) {
+          this._transactions[key] = output;
+        } else {
+          this._transactions[key].sourceSystemMeta = this._transactions[key].sourceSystemMeta + output.sourceSystemMeta
+          this._transactions[key].institution = this._transactions[key].institution + "|" + output.institution
+          this._transactions[key].merchant = this._transactions[key].merchant + "|" + output.merchant
+          this._transactions[key].amountString = this._transactions[key].amountString + "|" + output.amountString
+          this._transactions[key].amount = this._transactions[key].amount + output.amount
+          this._transactions[key].notes = this._transactions[key].notes + "|" + output.notes;
+          this._transactions[key].isTransfer = this._transactions[key].isTransfer || output.isTransfer
+        }
+      }
+      callback();
+      break;
+    default:
+      callback(new InvalidRowClassificationError);
+    }
+  }
+
+  _flush(callback) {
+    if (this.deferUpserts) {
+      for (const key in this._transactions) {
+        this.push(this._transactions[key]);
+      }
+    }
+    callback();
+  }
 }
 
 async function TransformRecords(input) {
@@ -223,7 +327,6 @@ async function TransformRecords(input) {
         amount: parseFloat(adapter.amount(row).replace(/[\$\s,]/g,"")),
         notes: adapter.notes(row),
 
-        // TODO once the processor is built, remove this _and_ add a whitelist to the database module
         isTransfer: transfer,
       };
       this.push(output);
@@ -237,4 +340,4 @@ async function TransformRecords(input) {
     .pipe(transformer);
 }
 
-module.exports = { TransformRecords };
+module.exports = { TransactionParser };

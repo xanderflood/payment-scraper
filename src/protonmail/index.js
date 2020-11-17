@@ -170,10 +170,10 @@ function scrapeDeltaEmail(email, body) {
 			throw new UnrecognizedEmailError
 		}
 	} else if (email.subject.startsWith("Large Deposit Alert")) {
-		// TODO sohuld I be ignoring these? how do they differ from the others?
+		// TODO should I be ignoring these? how do they differ from the others?
 		return //ignore
 	} else if (email.subject.startsWith("Large Withdrawal Alert")) {
-		// TODO sohuld I be ignoring these? how do they differ from the others?
+		// TODO should I be ignoring these? how do they differ from the others?
 		return //ignore
 	} else {
 		throw new UnrecognizedEmailError

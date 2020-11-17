@@ -7,7 +7,6 @@ class ProtonCommand extends Command {
     const {flags} = this.parse(ProtonCommand)
 
     const database = new Database(flags.postgresConnection, flags.development);
-    await database.initialize();
 
     await scrapeOnce(
       flags.username,

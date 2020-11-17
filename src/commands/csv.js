@@ -1,10 +1,9 @@
 const { Command, flags } = require('@oclif/command')
 const { Database } = require ('../database');
-const protonmail = require('../protonmail');
-const { TransformRecords } = require('../csv')
+const { TransactionParser } = require('../csv')
 const csv = require('csv');
 const { createReadStream, createWriteStream } = require('fs');
-const { Transform } = require('stream');
+const { Transform, Writable } = require('stream');
 
 const Logger = require('node-json-logger');
 const logger = new Logger();
@@ -18,16 +17,37 @@ class CSVCommand extends Command {
       input = createReadStream(args.inputFile);
     }
 
-    const recordStream = await TransformRecords(input);
+    const csvParser = csv.parse({
+      skip_empty_lines: true,
+      relax_column_count: true,
+    });
+
+    const transactionParser = new TransactionParser();
+
+    const records = input
+      .pipe(csvParser)
+      .pipe(transactionParser);
+
+    var pipeline;
     if (flags.postgresConnection) {
       const db = new Database(flags.postgresConnection, flags.development);
+      var upserter = new Writable({
+        objectMode: true,
+        async write(record, _, next) {
+          try {
+            await db.createTransaction(record);
+            next();
+          } catch (e) {
+            next(e);
+          }
+        },
+      });
 
-      await db.initialize();
-
-      recordStream.
-        pipe(db.initAsyncUpserter());
+      pipeline = records.
+        pipe(upserter).
+        on('close', db.close);
     } else {
-      var stringifier = csv.stringify({
+      const stringifier = csv.stringify({
         header: !flags.noOutputHeader,
         parallel: 1,
         columns: [
@@ -40,19 +60,22 @@ class CSVCommand extends Command {
         ],
       });
 
-      var output = args.outputFile
+      const output = args.outputFile
         ? createWriteStream(args.outputFile)
         : process.stdout;
 
-      recordStream.
+      pipeline = records.
         pipe(outputRowProcessor()).
         pipe(stringifier).
         pipe(output);
     }
+
+    pipeline.
+      on('error', (e) => logger.error("upsert failed:", e.message));
   }
 }
 
-CSVCommand.description = `Start the protonmail email scanning agent
+CSVCommand.description = `Ingest or process a CSV file
 `
 
 CSVCommand.args = [
@@ -78,7 +101,7 @@ function outputRowProcessor() {
       }
 
       return next(null, [
-        `${object.sourceSystem}|${object.sourceSystemId}`,
+        `${object.sourceSystem}|${object.sourceSystemId || ""}`,
         object.merchant,
         object.transactionDate,
         -object.amount,
