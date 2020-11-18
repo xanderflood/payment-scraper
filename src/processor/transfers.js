@@ -18,6 +18,11 @@ const StandardTransferIdentifiers = [
 	and(isCSVSource("venmo"), csvSourceEntry(6, isEqualTo(""))),
 	and(isCSVSource("cashApp"), csvSourceEntry(9, isEqualTo("TRANSFER SENT"))),
 	and(isCSVSource("capitalOne"), csvSourceEntry(4, isEqualTo("Payment/Credit"))),
+
+	startsWith("merchant", "CAPITAL ONE AUTOPAY PYMT"),
+	startsWith("merchant", "TRANSFER ALEXANDER FLOOD:Alexander Flood"),
+	startsWith("merchant", "Online Banking payment to CRD"),
+	startsWith("merchant", "Online payment from SAV"),
 ];
 
 module.exports = {StandardTransferIdentifiers};

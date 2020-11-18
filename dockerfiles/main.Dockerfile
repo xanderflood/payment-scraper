@@ -8,5 +8,6 @@ RUN yarn install --production
 
 COPY bin/ bin/
 COPY src/ src/
+COPY db/ db/
 
 ENTRYPOINT [ "./bin/run" ]

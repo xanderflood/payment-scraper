@@ -45,7 +45,7 @@ class LoadRulesCommand extends Command {
       pipe(parser).
       pipe(transformer).
       pipe(upserter).
-      on('close', db.close).
+      on('close', () => console.log("done")).
       on('error', (e) => logger.error("upsert failed:", e.message));
   }
 }

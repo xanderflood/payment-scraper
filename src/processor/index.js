@@ -1,4 +1,20 @@
-const {StandardTransferIdentifiers} = require('./transfers');
+const { StandardTransferIdentifiers } = require('./transfers');
+
+const numericEqualityThreshold = 0.01
+
+function compile(rule) {
+	return (transaction) => {
+		var matched = false
+		switch (rule.type) {
+		case "regex":
+			matched = !!(transaction[rule.field].match(new RegExp(rule.string), "i"));
+		case "numeric":
+			matched = Math.abs(rule.number - transaction[rule.field]) < numericEqualityThreshold;
+		}
+
+		return matched ? tranaction.categoryId : undefined;
+	};
+}
 
 class Processor {
 	constructor(database) {
@@ -7,7 +23,7 @@ class Processor {
 	}
 
 	async initialize() {
-		this.categorizers = await this.database.getRules();
+		this.categorizers = (await this.database.getRules()).map(compile);
 	}
 
 	async processTransaction(transaction) {
@@ -21,7 +37,7 @@ class Processor {
 		for (var i = this.categorizers.length - 1; i >= 0; i--) {
 			var c = this.categorizers[i];
 			var categoryId;
-			if (categoryId = this.categorizers[i].apply(transaction)) {
+			if (categoryId = this.categorizers[i](transaction)) {
 				update.categoryId = categoryId;
 				break;
 			}
