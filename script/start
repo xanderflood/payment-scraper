@@ -1,0 +1,46 @@
+#!/bin/bash
+
+### first, re-build the images if necessary
+docker build . -f dockerfiles/main.Dockerfile -t payment:main
+docker build . -f dockerfiles/dbmgr.Dockerfile -t payment:dbmgr
+
+### then, prepare the arguments for each process
+DOCKER_VOLUME=payments_db
+POSTGRES_CONNECTION_STRING=postgresql://postgres@localhost/postgres
+
+case "$ENV" in
+	prod)
+		EXTRA_PG_DOCKER_ARGS="-e PGDATA=/var/lib/postgresql/data/pgdata -v $DOCKER_VOLUME:/var/lib/postgresql/data"
+		;;
+	dev)
+		DEVELOPMENT=true
+		NEEDS_MIGRATION=true
+		;;
+	*)
+		echo "ENV must be one of test or dev - got \"$ENV\""
+		exit 1
+		;;
+esac
+
+### launch each process
+source .env
+
+# postgres
+docker rm payments_postgres || echo
+docker run --name payments_postgres -i \
+	--network host -p 5432:5423 \
+	-e POSTGRES_HOST_AUTH_METHOD=trust \
+	$EXTRA_PG_DOCKER_ARGS postgres:12.4 &
+
+if [ ! -z ${NEEDS_MIGRATION+x} ]; then
+	sleep 5
+	docker run -ie POSTGRES_CONNECTION_STRING \
+		--network host local:dbmgr db:migrate
+fi
+
+# telegram bot
+docker rm payments_telegram || echo
+docker run --name payments_telegram -i \
+	--network host -e POSTGRES_CONNECTION_STRING \
+	-e TELEGRAM_BOT_API_TOKEN -e TELEGRAM_BOT_API_CHAT_ID \
+	-e DEVELOPMENT payment:main telegram &

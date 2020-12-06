@@ -1,0 +1,4 @@
+#!/bin/bash
+
+docker kill payments_postgres || echo "couldn't stop postgres"
+docker kill payments_telegram || echo "couldn't stop telegram"

@@ -14,6 +14,7 @@ class RecordNotFoundError extends Error {
 }
 
 class Database {
+	// TODO get rid of connectionURL, enforce that all db config is ambient?
 	constructor(connectionURL, development) {
 		this._data = [];
 		this.development = development;
@@ -28,21 +29,26 @@ class Database {
 	async addCategory(attrs) {
 		return await Category.create(attrs);
 	}
-	// async categorizeTransaction(trShortId, catSlug, notes="") {
-	// 	// allow full UUIDs as well
-	// 	trShortId = trShortId.slice(0, 5);
-	// 	catSlug = catSlug.slice(0, 5);
+	async categorizeTransaction(trShortId, catSlug, notes="") {
+		// allow full UUIDs as well (TODO move this upstairs to the bot code)
+		trShortId = trShortId.slice(0, 5);
+		catSlug = catSlug.slice(0, 5);
 
-	// 	var cats = await Category.findAll({ where: { slug: catSlug } });
-	// 	if (cats.length < 1) throw new RecordNotFoundError("category", catSlug);
+		var cats = await Category.findAll({ where: { slug: catSlug } });
+		if (cats.length < 1) throw new RecordNotFoundError("category", catSlug);
+		const catId = cats[0].id;
 
-	// 	var transactions = await Transaction.update(
-	// 		{ categoryId: cats[0].id, notes: notes },
-	// 		{ where: { shortId: trShortId } },
-	// 	)
-	// 	if (transactions.length < 1) throw new RecordNotFoundError("transaction", trShortId);
-	// 	return transactions[0];
-	// }
+		var transactions = await Transaction.update(
+			{	isProcessed: true,
+				categoryId: catId,
+				notes: notes,
+			},
+			{ where: { shortId: trShortId } },
+		);
+		if (transactions.length < 1) throw new RecordNotFoundError("transaction", trShortId);
+
+		return transactions[0];
+	}
 	async getTransactionBySourceSystemId(sourceSystem, sourceSystemId) {
 		var identifiers = { sourceSystem: sourceSystem, sourceSystemId: sourceSystemId }
 		return await Transaction.findAll({ where: identifiers, });
@@ -65,7 +71,7 @@ class Database {
 	async saveTransactionProcessingResult(trId, update) {
 		let catId;
 		if (update.catSlug) {
-			var cats = await Category.findAll({ zwhere: { slug: update.catSlug } });
+			var cats = await Category.findAll({ where: { slug: update.catSlug } });
 			if (cats.length < 1) throw new RecordNotFoundError("category", update.catSlug);
 			catId = cats[0].id;
 		}
