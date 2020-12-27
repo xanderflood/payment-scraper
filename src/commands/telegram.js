@@ -2,17 +2,21 @@ const {Command, flags} = require('@oclif/command')
 const {Database} = require ('../database');
 const {Bot} = require('../telegram');
 
+const Logger = require('node-json-logger');
+const logger = new Logger();
+
 class TelegramCommand extends Command {
   async run() {
-    const {flags} = this.parse(TelegramCommand)
+    const {flags} = this.parse(TelegramCommand);
 
     const database = new Database(flags.postgresConnection, flags.development);
     const bot = new Bot(
       flags.botAPIToken,
       flags.botAPIChatID,
       database,
-    )
+    );
 
+    logger.info("starting telegram bot daemon...");
     bot.start();
   }
 }

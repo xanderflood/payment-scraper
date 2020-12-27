@@ -4,7 +4,7 @@ WORKDIR /src
 
 COPY package.json package.json
 COPY yarn.lock yarn.lock
-RUN yarn install --production
+RUN yarn --immutable
 
 COPY bin/ bin/
 COPY src/ src/
