@@ -1,12 +1,17 @@
-#!/bin/bash
+#!/bin/bash -ex
 
 ### first, re-build the images if necessary
 docker build . -f dockerfiles/main.Dockerfile -t payment:main
 docker build . -f dockerfiles/dbmgr.Dockerfile -t payment:dbmgr
+docker build . -f dockerfiles/web.Dockerfile -t payment:web
+docker pull wernight/ngrok@sha256:db041ea2c4de7f0dd4b9bdc47d286c6e5fa4488468708ba249e9de75ca7fdd29
+docker tag wernight/ngrok@sha256:db041ea2c4de7f0dd4b9bdc47d286c6e5fa4488468708ba249e9de75ca7fdd29 payment:ngrok
 
 ### then, prepare the arguments for each process
 DOCKER_VOLUME=payments_db
 POSTGRES_CONNECTION_STRING=postgresql://postgres@localhost/postgres
+
+source .env
 
 case "$ENV" in
 	prod)
@@ -23,24 +28,46 @@ case "$ENV" in
 esac
 
 ### launch each process
-source .env
 
 # postgres
-docker rm payments_postgres || echo
-docker run --name payments_postgres -i \
+docker run --rm --name payments_postgres -i \
 	--network host -p 5432:5423 \
 	-e POSTGRES_HOST_AUTH_METHOD=trust \
 	$EXTRA_PG_DOCKER_ARGS postgres:12.4 &
-
 if [ ! -z ${NEEDS_MIGRATION+x} ]; then
 	sleep 5
+	docker run -it --network host \
+		postgres:12.4 psql postgresql://postgres@localhost/postgres \
+		-c 'CREATE EXTENSION pgcrypto'
 	docker run -ie POSTGRES_CONNECTION_STRING \
-		--network host local:dbmgr db:migrate
+		--network host payment:dbmgr db:migrate
 fi
 
 # telegram bot
-docker rm payments_telegram || echo
-docker run --name payments_telegram -i \
+docker run --rm --name payments_telegram -i \
 	--network host -e POSTGRES_CONNECTION_STRING \
 	-e TELEGRAM_BOT_API_TOKEN -e TELEGRAM_BOT_API_CHAT_ID \
 	-e DEVELOPMENT payment:main telegram &
+
+# ngrok
+docker run --rm --name payments_ngrok -i \
+	--network host -e NGROK_AUTH -e NGROK_HOSTNAME \
+	-e NGROK_PORT=8081 payment:ngrok &
+
+
+# webhook server
+docker run --rm --name payments_webhooks -i \
+	--network host \
+	-e TELEGRAM_BOT_API_CHAT_ID -e APP_PORT \
+	-e POSTGRES_CONNECTION_STRING -e PLAID_ENV \
+	-e PLAID_CLIENT_ID -e PLAID_SECRET \
+	payment:main webhookAPI &
+
+# app server
+docker run --rm --name payments_web -i \
+	--network host -e NGROK_AUTH -e NGROK_DOMAIN \
+	-e TELEGRAM_BOT_API_CHAT_ID -e APP_PORT \
+	-e POSTGRES_CONNECTION_STRING -e PLAID_ENV \
+	-e PLAID_CLIENT_ID -e PLAID_SECRET \
+	-e PLAID_CLIENT_NAME -e SERVER_URI \
+	-e WEBHOOK_URL payment:web web &

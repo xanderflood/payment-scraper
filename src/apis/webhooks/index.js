@@ -106,7 +106,7 @@ class WebhookServer {
           response.json({});
           return;
         } else {
-          logger.error("unrecognized plaid webhook code - responding with 200 to ignore:" request.body.webhook_code);
+          logger.error("unrecognized plaid webhook code - responding with 200 to ignore:", request.body.webhook_code);
           response.json({});
           return;
         }

@@ -8,6 +8,7 @@ module.exports = (sequelize, DataTypes) => {
 
   class CategoryRule extends Model {};
   CategoryRule.init({
+    // NOTE: id is generated on insert from gen_random_uuid()
     id: { type: DataTypes.UUID, primaryKey: true },
     categoryId: { type: DataTypes.UUID, references: { model: Category, key: 'id' }, field: "category_id" },
 
@@ -19,9 +20,6 @@ module.exports = (sequelize, DataTypes) => {
     sequelize,
     modelName: 'CategoryRule',
     tableName: "category_rules",
-  });
-  CategoryRule.beforeCreate(async (tr, options) => {
-    tr.id = uuidv4();
   });
   return CategoryRule;
 };

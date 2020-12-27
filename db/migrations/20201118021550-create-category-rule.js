@@ -2,7 +2,7 @@
 module.exports = {
   up: async (queryInterface, Sequelize) => {
     await queryInterface.createTable('category_rules', {
-      id: { type: Sequelize.UUID, primaryKey: true },
+      id: { type: Sequelize.UUID, primaryKey: true, defaultValue: Sequelize.literal('gen_random_uuid()') },
       categoryId: { type: Sequelize.UUID, references: { model: 'categories', key: 'id' }, field: "category_id" },
 
       field:  { type: Sequelize.STRING, isIn: [["merchant", "notes", "amount"]] },

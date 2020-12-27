@@ -2,8 +2,8 @@
 module.exports = {
   up: async (queryInterface, Sequelize) => {
     await queryInterface.createTable('transactions', {
-      id:      { type: Sequelize.UUID, primaryKey: true },
-      shortId: { type: Sequelize.STRING, unique: true, field: "short_id" },
+      id:      { type: Sequelize.UUID, primaryKey: true, defaultValue: Sequelize.literal('gen_random_uuid()') },
+      shortId: { type: 'varchar GENERATED ALWAYS AS (substring(id::varchar FROM 1 FOR 5)) STORED UNIQUE', field: 'short_id' },
 
       // scraper metadata
       sourceSystem:       { type: Sequelize.STRING, field: "source_system" },
@@ -13,9 +13,9 @@ module.exports = {
 
       // inferred fields
       transactionDate: { type: Sequelize.DATE, allowNull: false, field: "transaction_date" },
-      institution:     { type: Sequelize.STRING, allowNull: false },
-      merchant:        { type: Sequelize.STRING, allowNull: false },
-      amountString:    { type: Sequelize.STRING, allowNull: false, field: "amount_string" },
+      institution:     { type: Sequelize.STRING },
+      merchant:        { type: Sequelize.STRING },
+      amountString:    { type: Sequelize.STRING, field: "amount_string" },
       amount:          { type: Sequelize.DOUBLE, allowNull: false },
       notes:           { type: Sequelize.STRING },
 
