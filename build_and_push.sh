@@ -1,5 +1,3 @@
-#!/bin/sh -xe
-
 export PREFIX=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo ""; else echo "staging-" ; fi`
 export docker_repo=xanderflood/payment
 export docker_build_directory=.
