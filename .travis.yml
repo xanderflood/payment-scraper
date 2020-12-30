@@ -1,2 +1,14 @@
 language: node_js
 node_js: [12]
+services:
+  - docker
+
+after_script:
+  - docker login -u $DOCKER_USER -p $DOCKER_PASS
+  - export PREFIX=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo ""; else echo "staging-" ; fi`
+  - export docker_repo=xanderflood/payment
+  - export docker_build_directory=.
+
+  - name=main ./build/build_and_push_image.sh
+  - name=web ./build/build_and_push_image.sh
+  - name=dbmgr ./build/build_and_push_image.sh
