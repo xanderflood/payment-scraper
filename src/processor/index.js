@@ -43,7 +43,6 @@ function compile(rule) {
 
 class Processor {
 	constructor(database) {
-		this.transferIdentifiers = StandardTransferIdentifiers;
 		this.database = database;
 	}
 
