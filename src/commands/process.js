@@ -9,7 +9,7 @@ class ProcessCommand extends Command {
   async run() {
     const {flags, args} = this.parse(ProcessCommand)
 
-    const db = new Database(flags.postgresConnection, flags.development);
+    const db = new Database(flags.development);
     const processor = new Processor(db);
     try {
       await processor.initialize();
@@ -31,7 +31,6 @@ ProcessCommand.description = `Start the new transaction processor
 `
 
 ProcessCommand.flags = {
-  postgresConnection: flags.string({char: 'p', env: "POSTGRES_CONNECTION_STRING", description: 'Postgres connection URI', required: false}),
   development: flags.boolean({char: 'd', env: "DEVELOPMENT", description: 'development mode', default: true}),
 }
 

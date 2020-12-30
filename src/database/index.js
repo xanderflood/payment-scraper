@@ -13,8 +13,7 @@ class RecordNotFoundError extends Error {
 }
 
 class Database {
-	// TODO get rid of connectionURL, enforce that all db config is ambient?
-	constructor(connectionURL, development) {
+	constructor(development) {
 		this._data = [];
 		this.development = development;
 
