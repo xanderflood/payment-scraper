@@ -1,4 +1,4 @@
-/bin/sh -xe
+#!/bin/sh -xe
 
 docker build $docker_build_directory -t $docker_repo:${PREFIX}${name} -f dockerfiles/${name}.Dockerfile
 
