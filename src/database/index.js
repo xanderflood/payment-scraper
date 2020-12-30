@@ -103,16 +103,17 @@ class Database {
 	}
 
 	async saveRule(params) {
-		var cats = await this.models.Category.findAll({ where: { slug: params.catSlug } });
-		if (cats.length < 1) throw new RecordNotFoundError("category", params.catSlug);
+		var whitelistedFields = (({field, type, string, number, isTransfer, meta}) =>
+			({field, type, string, number, isTransfer, meta}))(params);
 
-		var whitelistedFields = (({field, type, string, number}) =>
-			({field, type, string, number}))(params);
+		if (params.catSlug) {
+			var cats = await this.models.Category.findAll({ where: { slug: params.catSlug } });
+			if (cats.length < 1) throw new RecordNotFoundError("category", params.catSlug);
 
-		return await CategoryRule.create(
-			{	categoryId: cats[0].id,
-				...whitelistedFields
-			});
+			whitelistedFields.categoryId = cats[0].id;
+		}
+
+		return await this.models.CategoryRule.create(whitelistedFields);
 	}
 
 	async saveCat(params) {
@@ -144,7 +145,7 @@ class Database {
 	}
 
 	async getRules() {
-		return await CategoryRule.findAll();
+		return await this.models.CategoryRule.findAll();
 	}
 }
 

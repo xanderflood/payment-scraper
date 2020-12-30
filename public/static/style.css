@@ -271,3 +271,14 @@ Errors
   color: #a94442;
   font-weight: bold;
 }
+
+/* For the expand/collapse buttons on the transactions data table */
+td.details-control {
+  text-align:center;
+  color:forestgreen;
+  cursor: pointer;
+}
+tr.shown td.details-control {
+  text-align:center;
+  color:red;
+}

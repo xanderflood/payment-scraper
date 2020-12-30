@@ -11,26 +11,18 @@ class ProcessCommand extends Command {
 
     const db = new Database(flags.postgresConnection, flags.development);
     const processor = new Processor(db);
-    await processor.initialize();
-
-    var trs;
     try {
-      trs = await db.getUnprocessedTransactions();
+      await processor.initialize();
     } catch (e) {
-      logger.error(`failed fetching unprocessed transactions: ${e.message}`, e);
+      logger.error(`failed initializing processor - aborting`, e);
       return;
     }
 
-    for (var i = trs.length - 1; i >= 0; i--) {
-      try {
-        let update = await processor.processTransaction(trs[i]);
-
-        if (Object.keys(update).length)
-          await db.saveTransactionProcessingResult(trs[i].id, update);
-      } catch (e) {
-        logger.error(`failed processing transaction: ${e.message}`, e);
-        return;
-      }
+    try {
+      await processor.processTransactions();
+    } catch (e) {
+      logger.error(`failed processing transactions - aborting`, e);
+      return;
     }
   }
 }

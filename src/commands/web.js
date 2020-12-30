@@ -1,6 +1,10 @@
 const { Command, flags } = require('@oclif/command')
 const { Database } = require('../database');
-const { WebServer } = require('../apis/web');
+const { Processor } = require('../processor');
+const { PlaidServer } = require('../apis/plaid');
+const { UploadServer } = require('../apis/uploads');
+const { TransactionServer } = require('../apis/transactions');
+const express = require('express');
 const plaid = require('plaid');
 
 const Logger = require('node-json-logger');
@@ -15,21 +19,36 @@ class WebCommand extends Command {
       webhookURL:      flags.webhookURL,
       plaidClientName: flags.plaidClientName,
       plaidEnv:        flags.plaidEnv,
-    }
-
+    };
     const plaidClient = new plaid.Client({
       clientID: flags.clientID,
       secret: flags.secret,
       env: plaid.environments[configuration.plaidEnv],
     });
     const database = new Database();
+    const processor = new Processor(database);
 
-    const app = new WebServer(configuration, database, plaidClient);
-    app.start();
+    const uploadServer = new UploadServer(database);
+    const plaidServer = new PlaidServer(configuration, database, plaidClient);
+    const tranServer = new TransactionServer(database, processor);
+
+    const app = express();
+    app.get('/', function (request, response, next) {
+      response.sendFile('./public/index.html', { root: process.cwd() });
+    });
+
+    app.use(express.static('public'));
+    app.use('/api/upload', uploadServer.router);
+    app.use('/api/plaid', plaidServer.router);
+    app.use('/api/transactions', tranServer.router);
+
+    app.listen(flags.port, function () {
+      logger.info('webserver listening on 0.0.0.0:' + flags.port);
+    });
   }
 }
 
-WebCommand.description = `Start the webhook API server
+WebCommand.description = `Start the web server
 `
 
 WebCommand.flags = {

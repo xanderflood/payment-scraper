@@ -22,11 +22,13 @@ class LoadRulesCommand extends Command {
 
     var transformer = csv.transform({ parallel: 1 }, function(row) {
       return {
-        type:    row[0],
-        field:   row[1],
-        catSlug: row[2],
-        string:  row[0] == "regex" ? row[3] : null,
-        number:  row[0] == "numeric" ? parseFloat(row[3]) : null,
+        type:       row[0],
+        field:      row[1],
+        catSlug:    row[2],
+        string:     row[0] == "regex" ? row[3] : null,
+        number:     row[0] == "numeric" ? parseFloat(row[3]) : null,
+        isTransfer: row[4] == "true",
+        meta:       row[5],
       };
     });
     var upserter = new Writable({

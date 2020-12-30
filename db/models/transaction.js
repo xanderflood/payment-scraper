@@ -10,10 +10,9 @@ module.exports = (sequelize, DataTypes) => {
 
   class Transaction extends Model {};
   Transaction.init({
-    // NOTE: id is generated on insert from gen_random_uuid()
-    id:      { type: DataTypes.UUID, primaryKey: true },
-    // as a column definition on its own
-    shortId: { type: DataTypes.STRING, field: "short_id" },
+    // NOTE: autoIncrement is a hack to prevent Sequelize from pushing a null value on create
+    id:      { type: DataTypes.UUID, primaryKey: true, autoIncrement: true },
+    shortId: { type: DataTypes.STRING, field: "short_id", unique: true },
 
     // scraper metadata
     sourceSystem:       { type: DataTypes.STRING, field: "source_system" },

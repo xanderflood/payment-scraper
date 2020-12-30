@@ -21,7 +21,7 @@ class WebhookServer {
 
     this.app.post('/v1/webhooks/plaid',
       this.getPlaidWebhookJwtConfig(),
-      bodyParser.json({ verify: this.computeSignature }),
+      bodyParser.json({ verify: this.verifySignature }),
       async (request, response) => {
         logger.info(`processing plaid webhook {type=${request.body.webhook_type}, code=${request.body.webhook_code}}`);
 
@@ -123,7 +123,8 @@ class WebhookServer {
     return webhookCode == "TRANSACTIONS_REMOVED";
   }
 
-  computeSignature(req, res, buf, encoding) {
+  verifySignature(req, res, buf, encoding) {
+    // reject tokens older than five minutes, per Plaid's recommendation
     if (Math.floor(+new Date() / 1000) - req.user.iat > 300) {
       throw new Error("received webhook request with stale token");
     }
