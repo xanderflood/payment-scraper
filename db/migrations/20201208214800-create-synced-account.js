@@ -3,7 +3,7 @@
 module.exports = {
   up: async (queryInterface, Sequelize) => {
     await queryInterface.createTable('synced_accounts', {
-      id:               { type: Sequelize.UUID, primaryKey: true },
+      id:               { type: Sequelize.UUID, primaryKey: true, defaultValue: Sequelize.literal('gen_random_uuid()') },
       sourceSystem:     { type: Sequelize.STRING, field: "source_system" },
       sourceSystemId:   { type: Sequelize.STRING, field: "source_system_id" },
       sourceSystemMeta: { type: Sequelize.JSONB, field: "source_system_meta" },
