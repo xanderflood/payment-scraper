@@ -34,7 +34,10 @@ class WebCommand extends Command {
     const tranServer = new TransactionServer(database, processor);
 
     const app = express();
-    app.use(expressStatsd());
+    if (flags.statsdAddress) {
+      logger.info("Adding statsd middleware")
+      app.use(expressStatsd({host: flags.statsdAddress}));
+    }
 
     app.get('/', function (request, response, next) {
       response.sendFile('./public/index.html', { root: process.cwd() });
@@ -61,7 +64,8 @@ WebCommand.flags = {
   clientID: flags.string({char: 'i', env: "PLAID_CLIENT_ID", required: true}),
   secret: flags.string({char: 's', env: "PLAID_SECRET", required: true}),
   plaidEnv: flags.string({char: 'e', env: "PLAID_ENV", default: 'sandbox'}),
-  plaidClientName: flags.string({char: 'e', env: "PLAID_CLIENT_NAME", default: 'Blue House'}),
+  plaidClientName: flags.string({char: 'n', env: "PLAID_CLIENT_NAME", default: 'Blue House'}),
+  statsdAddress: flags.string({char: 't', env: "STATSD_ADDRESS", required: false}),
 }
 
 module.exports = WebCommand
