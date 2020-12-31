@@ -1,4 +1,4 @@
-set -x
+set -xe
 
 tags="${PREFIX}${name}-build-${TRAVIS_BUILD_NUMBER},${PREFIX}${name}-commit-${TRAVIS_COMMIT::8},${PREFIX}${name}"
 for tag in ${tags//,/ }
