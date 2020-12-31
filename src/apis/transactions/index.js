@@ -1,7 +1,7 @@
 const express = require('express');
 const { Router } = require('express');
 const bodyParser = require('body-parser');
-const { errString } = require('../../utils');
+const { errString, statsdPath } = require('../../utils');
 
 const Logger = require('node-json-logger');
 const logger = new Logger();
@@ -14,11 +14,11 @@ class TransactionServer {
     this.router = new Router();
     this.router.use(bodyParser.json());
 
-    this.router.get('/categories', this.getCategories.bind(this));
-    this.router.get('/unprocessed', this.getUnprocessed.bind(this));
-    this.router.post('/categories', this.createCategory.bind(this));
-    this.router.post('/categorize', this.categorizeTransaction.bind(this));
-    this.router.post('/process', this.process.bind(this));
+    this.router.get('/categories', statsdPath('transaction_categories'), this.getCategories.bind(this));
+    this.router.get('/unprocessed', statsdPath('transaction_unprocessed'), this.getUnprocessed.bind(this));
+    this.router.post('/categories', statsdPath('transaction_categories'), this.createCategory.bind(this));
+    this.router.post('/categorize', statsdPath('transaction_categorize'), this.categorizeTransaction.bind(this));
+    this.router.post('/process', statsdPath('transaction_process'), this.process.bind(this));
   }
 
   async getCategories(request, response) {

@@ -2,6 +2,7 @@ const express = require('express');
 const { Router } = require('express');
 const bodyParser = require('body-parser');
 const plaid = require('plaid');
+const { statsdPath } = require('../../utils');
 
 const Logger = require('node-json-logger');
 const logger = new Logger();
@@ -16,7 +17,7 @@ class PlaidServer {
     this.router.use(bodyParser.urlencoded({extended: false}));
     this.router.use(bodyParser.json());
 
-    this.router.post('/info', async (request, response) => {
+    this.router.post('/info', statsdPath('plaid_info'), async (request, response) => {
       // TODO this should be re-written to produce an
       // array of items from the user id in a JWT
       response.json({
@@ -25,8 +26,8 @@ class PlaidServer {
       });
     });
 
-    this.router.post('/create_link_token', this.createLinkToken.bind(this));
-    this.router.post('/save_synced_account', this.saveSyncedAccount.bind(this));
+    this.router.post('/create_link_token', statsdPath('plaid_create_link_token'), this.createLinkToken.bind(this));
+    this.router.post('/save_synced_account', statsdPath('plaid_save_synced_account'), this.saveSyncedAccount.bind(this));
   }
 
   async createLinkToken(request, response) {

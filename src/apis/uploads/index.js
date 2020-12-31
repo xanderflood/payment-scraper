@@ -6,6 +6,7 @@ const multer = require('multer');
 const fs = require('fs');
 const csv = require('csv');
 const { Writable } = require('stream');
+const { statsdPath } = require('../../utils')
 
 const Router = express.Router;
 const logger = new Logger();
@@ -22,9 +23,9 @@ class UploadServer {
       .array('files', 20);
     this.router.use(multerMW);
 
-    this.router.post('/rules', this.buildRulesUploadHandler());
-    this.router.post('/categories', this.buildCategoriesUploadHandler());
-    this.router.post('/transactions', this.buildTransactionsUploadHandler());
+    this.router.post('/rules', statsdPath('upload_rules'), this.buildRulesUploadHandler());
+    this.router.post('/categories', statsdPath('upload_categories'), this.buildCategoriesUploadHandler());
+    this.router.post('/transactions', statsdPath('upload_transactions'), this.buildTransactionsUploadHandler());
   }
 
   buildRulesUploadHandler() {

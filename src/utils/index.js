@@ -16,4 +16,12 @@ function errString(error) {
   return JSON.stringify(error, replaceErrors)
 }
 
-module.exports = { errString }
+function statsdPath (path) {
+  return function (req, res, next) {
+    var method = req.method || 'unknown_method';
+    req.statsdKey = ['http', method.toLowerCase(), path].join('.');
+    next();
+  };
+}
+
+module.exports = { errString, statsdPath }
