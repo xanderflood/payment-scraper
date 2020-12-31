@@ -6,6 +6,7 @@ const cacheManager = require('cache-manager');
 const { JWK } = require('node-jwk');
 const compare = require('secure-compare');
 const sha256 = require('js-sha256');
+const { errString } = require('../../utils');
 
 const Logger = require('node-json-logger');
 const logger = new Logger();
@@ -33,8 +34,8 @@ class WebhookServer {
           for (var i = request.body.removed_transactions.length - 1; i >= 0; i--) {
             try {
               await this.database.deleteSourceSystemTransaction("PLAID", request.body.removed_transactions[i]);
-            } catch (e) {
-              logger.error("error deleting transaction - responding with 500:", error);
+            } catch (error) {
+              logger.error("error deleting transaction - responding with 500", errString(error));
               response.status(500).json({});
               return;
             }
@@ -45,8 +46,8 @@ class WebhookServer {
         } else if (this.shouldSaveTransactions(request.body.webhook_code)) {
           try {
             var acct = await database.getSyncedAccount("PLAID", request.body.item_id);
-          } catch (e) {
-            logger.error("error fetching account credentials from DB - responding with 500:", error);
+          } catch (error) {
+            logger.error("error fetching account credentials from DB - responding with 500", errString(error));
             response.status(500).json({});
             return;
           }
@@ -67,8 +68,8 @@ class WebhookServer {
                 { count: 250,
                   offset: totalRecords },
               );
-            } catch (e) {
-              logger.error("error fetching transactions from Plaid - responding with 500:", error);
+            } catch (error) {
+              logger.error("error fetching transactions from Plaid - responding with 500", errString(error));
               response.status(500).json({});
               return;
             }
@@ -97,8 +98,8 @@ class WebhookServer {
                   amount:          tr.amount,
                   institution:     plaidAccountsReference[tr.account_id].name,
                 });
-              } catch (e) {
-                logger.error("error saving transactions to DB - carrying on:", error);
+              } catch (error) {
+                logger.error("error saving transactions to DB - carrying on", errString(error));
               }
             }
           }
