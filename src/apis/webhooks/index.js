@@ -83,6 +83,7 @@ class WebhookServer {
               plaidAccountsReference[plaidAcct.account_id] = plaidAccountsReference[plaidAcct.account_id] || plaidAcct;
             }
 
+            logger.info(`upserting ${trResponse.transactions.length} transactions`);
             for (var i = trResponse.transactions.length - 1; i >= 0; i--) {
               // TODO stats alerting for errors
               const tr = trResponse.transactions[i];
