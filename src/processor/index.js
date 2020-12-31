@@ -69,7 +69,6 @@ class Processor {
 
 				if (update) {
 					await this.database.saveTransactionProcessingResult(trs[i].id, update);
-					break;
 				}
 			} catch (error) {
 				// TODO include skipped errors in API response
