@@ -1,3 +1,3 @@
-FROM xanderflood/payment:${PREFIX}main
+FROM local:main
 
 COPY public/ public/

@@ -1,4 +1,4 @@
-FROM xanderflood/payment:${PREFIX}main
+FROM local:main
 
 RUN yarn global add sequelize-cli
 
