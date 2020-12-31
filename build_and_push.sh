@@ -1,3 +1,5 @@
+set -x
+
 export PREFIX=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo ""; else echo "staging-" ; fi`
 
 docker login -u $DOCKER_USER -p $DOCKER_PASS
