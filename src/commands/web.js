@@ -7,6 +7,7 @@ const { TransactionServer } = require('../apis/transactions');
 const express = require('express');
 const plaid = require('plaid');
 
+const expressStatsd = require('express-statsd');
 const Logger = require('node-json-logger');
 const logger = new Logger();
 
@@ -33,6 +34,8 @@ class WebCommand extends Command {
     const tranServer = new TransactionServer(database, processor);
 
     const app = express();
+    app.use(expressStatsd());
+
     app.get('/', function (request, response, next) {
       response.sendFile('./public/index.html', { root: process.cwd() });
     });

@@ -44,6 +44,7 @@ class WebhookServer {
           response.json({});
           return;
         } else if (this.shouldSaveTransactions(request.body.webhook_code)) {
+          logger.info("upserting transactions", {plaid_item_id: request.body.webhook_code})
           try {
             var acct = await database.getSyncedAccount("PLAID", request.body.item_id);
           } catch (error) {
@@ -98,6 +99,7 @@ class WebhookServer {
                   merchant:        tr.merchant_name,
                   amount:          tr.amount,
                   institution:     plaidAccountsReference[tr.account_id].name,
+                  notes:           tr.name,
                 });
               } catch (error) {
                 logger.error("error saving transactions to DB - carrying on", errString(error));
