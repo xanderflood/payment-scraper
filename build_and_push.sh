@@ -1,4 +1,4 @@
-set -xe
+set -x -o errexit
 
 export PREFIX=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo ""; else echo "staging-" ; fi`
 
