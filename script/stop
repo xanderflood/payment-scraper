@@ -2,3 +2,6 @@
 
 docker kill payments_postgres || echo "couldn't stop postgres"
 docker kill payments_telegram || echo "couldn't stop telegram"
+docker kill payments_ngrok || echo "couldn't stop ngrok"
+docker kill payments_webhooks || echo "couldn't stop webhooks"
+docker kill payments_web || echo "couldn't stop web"

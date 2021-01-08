@@ -16,17 +16,19 @@ class LoadRulesCommand extends Command {
       input = createReadStream(args.inputFile);
     }
 
-    const db = new Database(flags.postgresConnection, flags.development);
+    const db = new Database(flags.development);
 
     var parser = csv.parse();
 
     var transformer = csv.transform({ parallel: 1 }, function(row) {
       return {
-        type:    row[0],
-        field:   row[1],
-        catSlug: row[2],
-        string:  row[0] == "regex" ? row[3] : null,
-        number:  row[0] == "numeric" ? parseFloat(row[3]) : null,
+        type:       row[0],
+        field:      row[1],
+        catSlug:    row[2],
+        string:     row[0] == "regex" ? row[3] : null,
+        number:     row[0] == "numeric" ? parseFloat(row[3]) : null,
+        isTransfer: row[4] == "true",
+        meta:       row[5],
       };
     });
     var upserter = new Writable({
@@ -58,7 +60,6 @@ LoadRulesCommand.args = [
 ]
 
 LoadRulesCommand.flags = {
-  postgresConnection: flags.string({char: 'p', env: "POSTGRES_CONNECTION_STRING", description: 'Postgres connection URI', required: true}),
   development: flags.boolean({char: 'd', env: "DEVELOPMENT", description: 'development mode', default: true}),
 }
 

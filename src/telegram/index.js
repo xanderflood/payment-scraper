@@ -52,7 +52,6 @@ function Bot(apiToken, apiChatID, database) {
 
 	// API
 	this.start = () => {
-		logger.info("starting to set up handlers")// TODO remove
 		_handle(/\/start/, "starting", async (msg) => {
 			await _sendMDV2Message(tgmd.escape(`Welcome! Enter /help to get started.`));
 		});
@@ -106,8 +105,6 @@ function Bot(apiToken, apiChatID, database) {
 
 			await _sendMDV2Message(`Categorized transcation \`\[${trShortID}\]\` "${catName}" \`\[${catSlug}\]\`\\\.`);
 		});
-
-		logger.info("finished setting up bot handlers")// TODO remove
 	}
 }
 

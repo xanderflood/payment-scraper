@@ -16,7 +16,7 @@ class LoadCatsCommand extends Command {
       input = createReadStream(args.inputFile);
     }
 
-    const db = new Database(flags.postgresConnection, flags.development);
+    const db = new Database(flags.development);
 
     var parser = csv.parse();
 
@@ -55,7 +55,6 @@ LoadCatsCommand.args = [
 ]
 
 LoadCatsCommand.flags = {
-  postgresConnection: flags.string({char: 'p', env: "POSTGRES_CONNECTION_STRING", description: 'Postgres connection URI', required: true}),
   development: flags.boolean({char: 'd', env: "DEVELOPMENT", description: 'development mode', default: true}),
 }
 

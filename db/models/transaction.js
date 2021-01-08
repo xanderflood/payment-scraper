@@ -6,11 +6,13 @@ const {
 } = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
   const Category = require('./category')(sequelize, DataTypes);
+  const SyncedAccount = require('./syncedaccount')(sequelize, DataTypes);
 
   class Transaction extends Model {};
   Transaction.init({
-    id:      { type: DataTypes.UUID, primaryKey: true },
-    shortId: { type: DataTypes.STRING, unique: true, field: "short_id" },
+    // NOTE: autoIncrement is a hack to prevent Sequelize from pushing a null value on create
+    id:      { type: DataTypes.UUID, primaryKey: true, autoIncrement: true },
+    shortId: { type: DataTypes.STRING, field: "short_id", unique: true },
 
     // scraper metadata
     sourceSystem:       { type: DataTypes.STRING, field: "source_system" },
@@ -20,9 +22,9 @@ module.exports = (sequelize, DataTypes) => {
 
     // inferred fields
     transactionDate: { type: DataTypes.DATE, allowNull: false, field: "transaction_date" },
-    institution:     { type: DataTypes.STRING, allowNull: false },
-    merchant:        { type: DataTypes.STRING, allowNull: false },
-    amountString:    { type: DataTypes.STRING, allowNull: false, field: "amount_string" },
+    institution:     { type: DataTypes.STRING },
+    merchant:        { type: DataTypes.STRING },
+    amountString:    { type: DataTypes.STRING, field: "amount_string" },
     amount:          { type: DataTypes.DOUBLE, allowNull: false },
     notes:           { type: DataTypes.STRING },
 
@@ -33,16 +35,14 @@ module.exports = (sequelize, DataTypes) => {
     isProcessed:         { type: DataTypes.BOOLEAN, defaultValue: false, allowNull: false, field: "is_processed" },
     systemNotes:         { type: DataTypes.STRING, field: "system_notes" },
 
-    categoryId: { type: DataTypes.UUID, references: { model: Category, key: 'id' }, field: "category_id" },
+    categoryId:      { type: DataTypes.UUID, references: { model: Category, key: 'id' }, field: "category_id" },
+    syncedAccountId: { type: DataTypes.UUID, references: { model: SyncedAccount, key: 'id' }, field: "synced_account_id" },
   }, {
     sequelize,
     modelName: 'Transaction',
     tableName: "transactions",
   });
   Transaction.beforeCreate(async (tr, options) => {
-    tr.id = uuidv4();
-    tr.shortId = tr.id.slice(0, 5);
-
     tr.sourceSystemDigest = crypto.createHash('md5')
       .update(JSON.stringify(tr.sourceSystemMeta))
       .digest("hex");
