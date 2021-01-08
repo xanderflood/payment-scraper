@@ -6,6 +6,7 @@ const cacheManager = require('cache-manager');
 const { JWK } = require('node-jwk');
 const compare = require('secure-compare');
 const sha256 = require('js-sha256');
+const { errString } = require('../../utils');
 
 const Logger = require('node-json-logger');
 const logger = new Logger();
@@ -21,7 +22,7 @@ class WebhookServer {
 
     this.app.post('/v1/webhooks/plaid',
       this.getPlaidWebhookJwtConfig(),
-      bodyParser.json({ verify: this.computeSignature }),
+      bodyParser.json({ verify: this.verifySignature }),
       async (request, response) => {
         logger.info(`processing plaid webhook {type=${request.body.webhook_type}, code=${request.body.webhook_code}}`);
 
@@ -33,8 +34,8 @@ class WebhookServer {
           for (var i = request.body.removed_transactions.length - 1; i >= 0; i--) {
             try {
               await this.database.deleteSourceSystemTransaction("PLAID", request.body.removed_transactions[i]);
-            } catch (e) {
-              logger.error("error deleting transaction - responding with 500:", error);
+            } catch (error) {
+              logger.error("error deleting transaction - responding with 500", errString(error));
               response.status(500).json({});
               return;
             }
@@ -43,10 +44,11 @@ class WebhookServer {
           response.json({});
           return;
         } else if (this.shouldSaveTransactions(request.body.webhook_code)) {
+          logger.info("upserting transactions", {plaid_item_id: request.body.webhook_code})
           try {
             var acct = await database.getSyncedAccount("PLAID", request.body.item_id);
-          } catch (e) {
-            logger.error("error fetching account credentials from DB - responding with 500:", error);
+          } catch (error) {
+            logger.error("error fetching account credentials from DB - responding with 500", errString(error));
             response.status(500).json({});
             return;
           }
@@ -67,8 +69,8 @@ class WebhookServer {
                 { count: 250,
                   offset: totalRecords },
               );
-            } catch (e) {
-              logger.error("error fetching transactions from Plaid - responding with 500:", error);
+            } catch (error) {
+              logger.error("error fetching transactions from Plaid - responding with 500", errString(error));
               response.status(500).json({});
               return;
             }
@@ -82,6 +84,7 @@ class WebhookServer {
               plaidAccountsReference[plaidAcct.account_id] = plaidAccountsReference[plaidAcct.account_id] || plaidAcct;
             }
 
+            logger.info(`upserting ${trResponse.transactions.length} transactions`);
             for (var i = trResponse.transactions.length - 1; i >= 0; i--) {
               // TODO stats alerting for errors
               const tr = trResponse.transactions[i];
@@ -96,9 +99,10 @@ class WebhookServer {
                   merchant:        tr.merchant_name,
                   amount:          tr.amount,
                   institution:     plaidAccountsReference[tr.account_id].name,
+                  notes:           tr.name,
                 });
-              } catch (e) {
-                logger.error("error saving transactions to DB - carrying on:", error);
+              } catch (error) {
+                logger.error("error saving transactions to DB - carrying on", errString(error));
               }
             }
           }
@@ -123,7 +127,8 @@ class WebhookServer {
     return webhookCode == "TRANSACTIONS_REMOVED";
   }
 
-  computeSignature(req, res, buf, encoding) {
+  verifySignature(req, res, buf, encoding) {
+    // reject tokens older than five minutes, per Plaid's recommendation
     if (Math.floor(+new Date() / 1000) - req.user.iat > 300) {
       throw new Error("received webhook request with stale token");
     }

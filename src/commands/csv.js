@@ -29,8 +29,8 @@ class CSVCommand extends Command {
       .pipe(transactionParser);
 
     var pipeline;
-    if (flags.postgresConnection) {
-      const db = new Database(flags.postgresConnection, flags.development);
+    if (flags.postgres) {
+      const db = new Database(flags.development);
       var upserter = new Writable({
         objectMode: true,
         async write(record, _, next) {
@@ -84,7 +84,7 @@ CSVCommand.args = [
 ]
 
 CSVCommand.flags = {
-  postgresConnection: flags.string({char: 'p', env: "POSTGRES_CONNECTION_STRING", description: 'Postgres connection URI', required: false}),
+  postgres: flags.boolean({char: 'p', env: "POSTGRES", description: 'Output to postgres instead of file - use ambient configuration', default: false}),
   noOutputHeader: flags.boolean({char: 'n', description: 'omit the header row from output', default: true}),
   development: flags.boolean({char: 'd', env: "DEVELOPMENT", description: 'development mode', default: true}),
 }

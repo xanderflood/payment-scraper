@@ -1,4 +1,4 @@
-FROM payment:main
+FROM local:main
 
 RUN yarn global add sequelize-cli
 

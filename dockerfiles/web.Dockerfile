@@ -1,3 +1,3 @@
-FROM payment:main
+FROM local:main
 
 COPY public/ public/

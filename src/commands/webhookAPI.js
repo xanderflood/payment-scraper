@@ -15,7 +15,7 @@ class WebhookAPICommand extends Command {
       secret: flags.secret,
       env: plaid.environments[flags.plaidEnv],
     });
-    const db = new Database("", flags.development);
+    const db = new Database(flags.development);
     const app = new WebhookServer(flags.port, db, plaidClient);
     app.start();
   }

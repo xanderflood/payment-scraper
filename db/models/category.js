@@ -6,7 +6,8 @@ const {
 module.exports = (sequelize, DataTypes) => {
   class Category extends Model {};
   Category.init({
-    id: { type: DataTypes.UUID, primaryKey: true },
+    // NOTE: autoIncrement is a hack to prevent Sequelize from pushing a null value on create
+    id: { type: DataTypes.UUID, primaryKey: true, autoIncrement: true },
     name: { type: DataTypes.STRING, unique: true, allowNull: false },
     slug: { type: DataTypes.STRING, unique: true, allowNull: false },
   }, {
