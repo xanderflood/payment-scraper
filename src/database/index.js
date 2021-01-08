@@ -1,4 +1,5 @@
 const { Transform } = require('stream');
+const { Op } = require('sequelize');
 
 const Logger = require('node-json-logger');
 const logger = new Logger();
@@ -145,6 +146,18 @@ class Database {
 
 	async getRules() {
 		return await CategoryRule.findAll();
+	}
+
+	async getIntersectingTransactions(startMoment, endMoment) {
+		return await this.models.Transaction.findAll({ where: {
+			amortize: { [Op.overlap]: [startMoment, endMoment] },
+		} });
+	}
+	async saveRollupForPeriod(startMoment, rollups) {
+		return await this.models.CategoryRule.create({
+			monthStart: startMonth,
+			rollup: rollup,
+		});
 	}
 }
 
