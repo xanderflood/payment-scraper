@@ -10,9 +10,9 @@ class Rollupper {
 		this.database = database;
 	}
 
-	async upsertRollupRecordForPeriod(startMoment, endMoment) {
+	async upsertRollupRecordForPeriod(start, end) {
 		try {
-			var transactions = await this.database.getIntersectingTransactions(startMoment, endMoment);
+			var transactions = await this.database.getIntersectingTransactions(start, end);
 		} catch (error) {
 			logger.error(`failed fetching tranasactions for period - rethrowing`, errString(error));
 			throw error;
@@ -20,7 +20,9 @@ class Rollupper {
 
 		var totalsByCategory = {};
 		for (var i = transactions.length - 1; i >= 0; i--) {
-			const weight = getAmortizationWeight(startMoment, endMoment, transactions[i].amortize);
+			const weight = getAmortizationWeight(start, end,
+				new DateTime(transactions[i].amortize[0]),
+				new DateTime(transactions[i].amortize[1]));
 
 			// TODO make sure uncategorized are also included
 			// TODO add a button/endpoint for mark-as-transfer
@@ -31,7 +33,7 @@ class Rollupper {
 		}
 
 		try {
-			await this.database.saveRollupForPeriod(startMoment, totalsByCategory);
+			await this.database.saveRollupForPeriod(start.toJSDate(), totalsByCategory);
 		} catch (error) {
 			logger.error(`failed saving rollups for period - rethrowing`, errString(error));
 			throw error;
@@ -61,18 +63,13 @@ class Rollupper {
 	}
 }
 
-function getAmortizationWeight(startMoment, endMoment, amortize) {
-	const startRangeI = startMoment.getTime();
-	const endRangeI = endMoment.getTime();
-	const startAmortizeI = amortize[0].getTime();
-	const endAmortizeI = amortize[1].getTime();
-	
-	const intersectionStart = max(startRangeI, startAmortizeI);
-	const intersectionEnd = max(endRangeI, endAmortizeI);
-	const intersectionDuration = intersectionEnd-intersectionStart;
+function getAmortizationWeight(periodStart, periodEnd, amortizeStart, amortizeEnd) {
+	const intersectionDuration = DateTime.min(periodEnd, amortizeEnd)
+		- DateTime.max(periodStart, amortizeStart);
 	if (intersectionDuration <= 0) return 0;
 
-	return intersectionDuration / intersectionDuration;
+	const amortizeDuration = amortizeEnd - amortizeStart;
+	return intersectionDuration / amortizeDuration;
 }
 
 module.exports = { Rollupper };
