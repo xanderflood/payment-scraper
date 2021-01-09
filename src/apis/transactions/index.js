@@ -101,7 +101,7 @@ class TransactionServer {
   }
   async buildRecentRollups(request, response) {
     try {
-      await this.rollupper.rollupRecentMonths(LOOKBACK_MONTHS);
+      await this.rollupper.rollupRecentMonths();
     } catch (error) {
       logger.error("error building rollups transaction - responding with 500", errString(error));
       return response.status(500).json({error: errString(error)});

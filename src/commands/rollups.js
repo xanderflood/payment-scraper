@@ -4,7 +4,6 @@ const { Database } = require('../database');
 const { Rollupper } = require('../rollups');
 
 const logger = new Logger();
-const LOOKBACK_MONTHS = 12;
 
 class RollupsCommand extends Command {
   async run() {
@@ -14,7 +13,7 @@ class RollupsCommand extends Command {
     const rollupper = new Rollupper(db);
 
     try {
-      await rollupper.rollupRecentMonths(LOOKBACK_MONTHS);
+      await rollupper.rollupRecentMonths();
     } catch (error) {
       throw error;
     }

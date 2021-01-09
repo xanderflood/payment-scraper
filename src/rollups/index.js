@@ -3,6 +3,7 @@ const { errString } = require('../utils');
 const { DateTime } = require('luxon');
 
 const logger = new Logger();
+const DEFAULT_LOOKBACK_MONTHS = 12;
 
 class Rollupper {
 	constructor(database) {
@@ -21,6 +22,9 @@ class Rollupper {
 		for (var i = transactions.length - 1; i >= 0; i--) {
 			const weight = getAmortizationWeight(startMoment, endMoment, transactions[i].amortize);
 
+			// TODO make sure uncategorized are also included
+			// TODO add a button/endpoint for mark-as-transfer
+
 			const cat = transactions[i].categoryId;
 			if (!totalsByCategory[cat]) totalsByCategory[cat] = 0;
 			totalsByCategory[cat] += weight * transactions[i].amount;
@@ -35,7 +39,7 @@ class Rollupper {
 	}
 
 	async rollupRecentMonths(lookbackMonths) {
-		var start = this.startOfThisMonth().minus({months: lookbackMonths});
+		var start = this.startOfThisMonth().minus({months: lookbackMonths || DEFAULT_LOOKBACK_MONTHS});
 		var end = start.plus({months: 1});
 		for (var i = 0; i < 12; i++) {
 			try {
