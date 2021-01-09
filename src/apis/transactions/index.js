@@ -7,9 +7,10 @@ const Logger = require('node-json-logger');
 const logger = new Logger();
 
 class TransactionServer {
-  constructor (database, processor) {
+  constructor (database, processor, rollupper) {
     this.database = database;
     this.processor = processor;
+    this.rollupper = rollupper;
 
     this.router = new Router();
     this.router.use(bodyParser.json());
