@@ -65,11 +65,22 @@
 
           <div class="panel panel-default">
             <div class="panel-heading">
-              <a data-toggle="collapse" href="#uploads_collapse"><h2>Trigger Transaction Processor</h2></a>
+              <a data-toggle="collapse" href="#process_collapse"><h2>Trigger Transaction Processor</h2></a>
             </div>
             <div class="panel-body">
               <form method="POST" action="/api/transactions/process" enctype="application/json">
-                <input text="" type="submit">
+                <input text="Process new transactions" type="submit">
+              </form>
+            </div>
+          </div>
+
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <a data-toggle="collapse" href="#rollups_collapse"><h2>Monthly Rollups</h2></a>
+            </div>
+            <div class="panel-body">
+              <form method="POST" action="/api/transactions/rollups" enctype="application/json">
+                <input text="Total recent transactions" type="submit">
               </form>
             </div>
           </div>

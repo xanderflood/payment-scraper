@@ -19,6 +19,7 @@ class TransactionServer {
     this.router.post('/categories', statsdPath('transaction_categories'), this.createCategory.bind(this));
     this.router.post('/categorize', statsdPath('transaction_categorize'), this.categorizeTransaction.bind(this));
     this.router.post('/process', statsdPath('transaction_process'), this.process.bind(this));
+    this.router.post('/rollups', statsdPath('transaction_rollups'), this.buildRecentRollups.bind(this));
   }
 
   async getCategories(request, response) {
@@ -93,6 +94,16 @@ class TransactionServer {
       logger.error(`failed processing transactions - responding with 500`, errString(error));
       response.status(500).json({error: errString(error)});
       return;
+    }
+
+    response.json({status: 200, message: "success"});
+  }
+  async buildRecentRollups(request, response) {
+    try {
+      await this.rollupper.rollupRecentMonths(LOOKBACK_MONTHS);
+    } catch (error) {
+      logger.error("error building rollups transaction - responding with 500", errString(error));
+      return response.status(500).json({error: errString(error)});
     }
 
     response.json({status: 200, message: "success"});

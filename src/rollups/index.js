@@ -1,5 +1,7 @@
 const Logger = require('node-json-logger');
-const { errString } = require('../utils')
+const { errString } = require('../utils');
+const { DateTime } = require('luxon');
+
 const logger = new Logger();
 
 class Rollupper {
@@ -29,6 +31,25 @@ class Rollupper {
 		} catch (error) {
 			logger.error(`failed saving rollups for period - rethrowing`, errString(error));
 			throw error;
+		}
+	}
+
+	async rollupRecentMonths(lookbackMonths) {
+		var start = DateTime.local();
+		start = DateTime.local(start.year, start.month);
+		start = start.minus({months: lookbackMonths});
+		var end = start.plus({months: 1});
+		for (var i = 0; i < 12; i++) {
+			try {
+				await this.upsertRollupRecordForPeriod(start, end);
+			} catch (error) {
+				logger.error(`failed building rollup for month starting ${start} - rethrowing`, errString(error));
+				throw error;
+			}
+
+			// switch to the next month
+			start = end;
+			end = start.plus({months: 1});
 		}
 	}
 }
