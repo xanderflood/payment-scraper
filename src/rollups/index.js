@@ -35,9 +35,7 @@ class Rollupper {
 	}
 
 	async rollupRecentMonths(lookbackMonths) {
-		var start = DateTime.local();
-		start = DateTime.local(start.year, start.month);
-		start = start.minus({months: lookbackMonths});
+		var start = this.startOfThisMonth().minus({months: lookbackMonths});
 		var end = start.plus({months: 1});
 		for (var i = 0; i < 12; i++) {
 			try {
@@ -51,6 +49,11 @@ class Rollupper {
 			start = end;
 			end = start.plus({months: 1});
 		}
+	}
+
+	startOfThisMonth() {
+		var start = DateTime.local();
+		return DateTime.local(start.year, start.month);
 	}
 }
 
