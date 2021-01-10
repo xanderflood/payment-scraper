@@ -1,6 +1,7 @@
 const { Command, flags } = require('@oclif/command')
 const { Database } = require('../database');
 const { Processor } = require('../processor');
+const { Rollupper } = require('../rollups');
 const { PlaidServer } = require('../apis/plaid');
 const { UploadServer } = require('../apis/uploads');
 const { TransactionServer } = require('../apis/transactions');
@@ -28,10 +29,11 @@ class WebCommand extends Command {
     });
     const database = new Database();
     const processor = new Processor(database);
+    const rollupper = new Rollupper(database);
 
     const uploadServer = new UploadServer(database);
     const plaidServer = new PlaidServer(configuration, database, plaidClient);
-    const tranServer = new TransactionServer(database, processor);
+    const tranServer = new TransactionServer(database, processor, rollupper);
 
     const app = express();
     if (flags.statsdAddress) {
