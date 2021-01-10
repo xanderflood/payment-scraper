@@ -5,12 +5,12 @@ const Logger = require('node-json-logger');
 const logger = new Logger();
 
 class RecordNotFoundError extends Error {
-  constructor(type, id) {
-    super(`Could not find record of type \`${type}\` with id \`${id}\``)
+	constructor(type, id) {
+		super(`Could not find record of type \`${type}\` with id \`${id}\``)
 
-    this.type = type;
-    this.id = id;
-  }
+		this.type = type;
+		this.id = id;
+	}
 }
 
 class Database {
@@ -149,16 +149,28 @@ class Database {
 	}
 
 	async getIntersectingTransactions(startMoment, endMoment) {
-		return await this.models.Transaction.findAll({ where: {
-			amortize: { [Op.overlap]: [startMoment, endMoment] },
-		} });
+		const start = formatDate(startMoment);
+		const end = formatDate(endMoment);
+
+		return (await this.models.sequelize.query(`
+SELECT * FROM transactions
+WHERE (amortize IS NULL
+		AND daterange(${start}, ${end}) @> transaction_date::date
+	) OR NOT (daterange(${start}, ${end}) && amortize)
+`))[0];
 	}
-	async saveRollupForPeriod(startMoment, rollups) {
-		return await this.models.CategoryRule.create({
-			monthStart: startMonth,
+	async saveRollupForPeriod(startMoment, rollup) {
+		return await this.models.Rollup.upsert({
+			monthStart: startMoment,
 			rollup: rollup,
 		});
 	}
+}
+
+function formatDate(ts) {
+	return '\'' + ts.getFullYear().toString().padStart(4, "0") + '-'
+		+ (ts.getMonth()+1).toString().padStart(2, "0") + '-'
+		+ ts.getDate().toString().padStart(2, "0") + '\'::date';
 }
 
 module.exports = { Database, RecordNotFoundError }

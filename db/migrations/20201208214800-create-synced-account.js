@@ -14,7 +14,7 @@ module.exports = {
     });
 
     await queryInterface.addColumn('transactions', 'synced_account_id', {
-      type: Sequelize.UUID, references: { model: 'synced_accounts', key: 'id' }, field: "synced_account_id"
+      type: Sequelize.UUID, references: { model: 'synced_accounts', key: 'id' }, field: "synced_account_id",
     });
   },
 

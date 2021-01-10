@@ -12,7 +12,7 @@ class Rollupper {
 
 	async upsertRollupRecordForPeriod(start, end) {
 		try {
-			var transactions = await this.database.getIntersectingTransactions(start, end);
+			var transactions = await this.database.getIntersectingTransactions(start.toJSDate(), end.toJSDate());
 		} catch (error) {
 			logger.error(`failed fetching tranasactions for period - rethrowing`, errString(error));
 			throw error;
@@ -20,14 +20,15 @@ class Rollupper {
 
 		var totalsByCategory = {};
 		for (var i = transactions.length - 1; i >= 0; i--) {
-			const weight = getAmortizationWeight(start, end,
-				new DateTime(transactions[i].amortize[0]),
-				new DateTime(transactions[i].amortize[1]));
+			if (transactions[i].amortize) {
+				var weight = getAmortizationWeight(start, end,
+					new DateTime(transactions[i].amortize[0]),
+					new DateTime(transactions[i].amortize[1]));
+			} else {
+				var weight = 1;
+			}
 
-			// TODO make sure uncategorized are also included
-			// TODO add a button/endpoint for mark-as-transfer
-
-			const cat = transactions[i].categoryId;
+			const cat = transactions[i].category_id;
 			if (!totalsByCategory[cat]) totalsByCategory[cat] = 0;
 			totalsByCategory[cat] += weight * transactions[i].amount;
 		}
@@ -47,7 +48,7 @@ class Rollupper {
 			try {
 				await this.upsertRollupRecordForPeriod(start, end);
 			} catch (error) {
-				logger.error(`failed building rollup for month starting ${start} - rethrowing`, errString(error));
+				logger.error(`failed producing rollup for month starting ${start} - rethrowing`, errString(error));
 				throw error;
 			}
 
