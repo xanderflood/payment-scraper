@@ -4,7 +4,6 @@ module.exports = {
     await queryInterface.createTable('rollups', {
       id: { type: Sequelize.UUID, primaryKey: true, defaultValue: Sequelize.literal('gen_random_uuid()') },
       monthStart: { type: Sequelize.DATE, field: "month_start", allowNull: false, unique: true },
-      categoryId: { type: Sequelize.UUID, field: "category_id" },
       rollup:     { type: Sequelize.JSONB, allowNull: false },
 
       createdAt: { allowNull: false, type: Sequelize.DATE },
