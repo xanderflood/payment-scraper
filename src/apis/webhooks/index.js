@@ -1,6 +1,5 @@
 const bodyParser = require('body-parser');
 const express = require('express');
-const moment = require('moment');
 const jwt = require('express-jwt');
 const cacheManager = require('cache-manager');
 const { JWK } = require('node-jwk');
@@ -53,15 +52,17 @@ class WebhookServer {
             return;
           }
 
-          // pull 7 days of transactions
-          const startDate = moment().subtract(7, 'days').format('YYYY-MM-DD');
-          const endDate = moment().format('YYYY-MM-DD');
+          const today = DateTime.local();
+          const endDate = today.toFormat('yyyy-MM-dd');
+          const startDate = today
+            .minus({days: lookbackDaysForCode(request.body.webhook_code)})
+            .toFormat('yyyy-MM-dd');
 
           var totalRecords = 0;
           var plaidAccountsReference = {};
           while (true) {
             try {
-              // TODO add some retrying
+              // TODO add some retrying - or switch to an event framework?
               var trResponse = await this.client.getTransactions(
                 acct.sourceSystemAuth.access_token,
                 startDate,
@@ -122,6 +123,9 @@ class WebhookServer {
     return (webhookCode == "INITIAL_UPDATE" ||
       webhookCode == "HISTORICAL_UPDATE" ||
       webhookCode == "DEFAULT_UPDATE");
+  }
+  lookbackDaysForCode(webhookCode) {
+    return webhookCode == "DEFAULT_UPDATE" ? 7 : 365;
   }
   shouldRemoveTransactions(webhookCode) {
     return webhookCode == "TRANSACTIONS_REMOVED";
