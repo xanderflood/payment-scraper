@@ -15,9 +15,9 @@ module.exports = (sequelize, DataTypes) => {
     shortId: { type: DataTypes.STRING, field: "short_id", unique: true },
 
     // scraper metadata
-    sourceSystem:       { type: DataTypes.STRING, field: "source_system" },
-    sourceSystemId:     { type: DataTypes.STRING, field: "source_system_id" },
-    sourceSystemMeta:   { type: DataTypes.JSONB, field: "source_system_meta" },
+    sourceSystem:       { type: DataTypes.STRING, field: "source_system", unique: 'transaction_source_system' },
+    sourceSystemId:     { type: DataTypes.STRING, field: "source_system_id", unique: 'transaction_source_system' },
+    sourceSystemMeta:   { type: DataTypes.JSONB,  field: "source_system_meta" },
     sourceSystemDigest: { type: DataTypes.STRING, field: "source_system_digest" },
 
     // inferred fields
