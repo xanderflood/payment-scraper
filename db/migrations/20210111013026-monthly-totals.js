@@ -16,7 +16,7 @@ DELETE FROM transactions WHERE id IN
 );
 `);
 
-    await queryInterface.sequelize.query(`CREATE UNIQUE INDEX transaction_source_system ON transactions`);
+    await queryInterface.sequelize.query(`CREATE UNIQUE INDEX transaction_source_system ON transactions (source_system, source_system_id)`);
   },
 
   down: async (queryInterface, Sequelize) => {
