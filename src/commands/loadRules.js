@@ -1,5 +1,5 @@
-const { Command, flags } = require('@oclif/command')
-const { Database } = require ('../database');
+const { Command, flags } = require('@oclif/command');
+const { Database } = require('../database');
 const csv = require('csv');
 const { createReadStream } = require('fs');
 const { Writable } = require('stream');
@@ -9,9 +9,9 @@ const logger = new Logger();
 
 class LoadRulesCommand extends Command {
   async run() {
-    const {flags, args} = this.parse(LoadRulesCommand)
+    const { flags, args } = this.parse(LoadRulesCommand);
 
-    var input = process.stdin
+    var input = process.stdin;
     if (args.inputFile != '-') {
       input = createReadStream(args.inputFile);
     }
@@ -20,15 +20,15 @@ class LoadRulesCommand extends Command {
 
     var parser = csv.parse();
 
-    var transformer = csv.transform({ parallel: 1 }, function(row) {
+    var transformer = csv.transform({ parallel: 1 }, function (row) {
       return {
-        type:       row[0],
-        field:      row[1],
-        catSlug:    row[2],
-        string:     row[0] == "regex" ? row[3] : null,
-        number:     row[0] == "numeric" ? parseFloat(row[3]) : null,
-        isTransfer: row[4] == "true",
-        meta:       row[5],
+        type: row[0],
+        field: row[1],
+        catSlug: row[2],
+        string: row[0] == 'regex' ? row[3] : null,
+        number: row[0] == 'numeric' ? parseFloat(row[3]) : null,
+        isTransfer: row[4] == 'true',
+        meta: row[5],
       };
     });
     var upserter = new Writable({
@@ -43,24 +43,27 @@ class LoadRulesCommand extends Command {
       },
     });
 
-    input.
-      pipe(parser).
-      pipe(transformer).
-      pipe(upserter).
-      on('close', () => console.log("done")).
-      on('error', (e) => logger.error("upsert failed:", e.message));
+    input
+      .pipe(parser)
+      .pipe(transformer)
+      .pipe(upserter)
+      .on('close', () => console.log('done'))
+      .on('error', (e) => logger.error('upsert failed:', e.message));
   }
 }
 
 LoadRulesCommand.description = `Start the rule loader
-`
+`;
 
-LoadRulesCommand.args = [
-  {name: "inputFile", required: true},
-]
+LoadRulesCommand.args = [{ name: 'inputFile', required: true }];
 
 LoadRulesCommand.flags = {
-  development: flags.boolean({char: 'd', env: "DEVELOPMENT", description: 'development mode', default: true}),
-}
+  development: flags.boolean({
+    char: 'd',
+    env: 'DEVELOPMENT',
+    description: 'development mode',
+    default: true,
+  }),
+};
 
-module.exports = LoadRulesCommand
+module.exports = LoadRulesCommand;

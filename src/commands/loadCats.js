@@ -1,5 +1,5 @@
-const { Command, flags } = require('@oclif/command')
-const { Database } = require ('../database');
+const { Command, flags } = require('@oclif/command');
+const { Database } = require('../database');
 const csv = require('csv');
 const { createReadStream } = require('fs');
 const { Writable } = require('stream');
@@ -9,9 +9,9 @@ const logger = new Logger();
 
 class LoadCatsCommand extends Command {
   async run() {
-    const {flags, args} = this.parse(LoadCatsCommand)
+    const { flags, args } = this.parse(LoadCatsCommand);
 
-    var input = process.stdin
+    var input = process.stdin;
     if (args.inputFile != '-') {
       input = createReadStream(args.inputFile);
     }
@@ -20,7 +20,7 @@ class LoadCatsCommand extends Command {
 
     var parser = csv.parse();
 
-    var transformer = csv.transform({ parallel: 1 }, function(row) {
+    var transformer = csv.transform({ parallel: 1 }, function (row) {
       return {
         name: row[0],
         slug: row[1],
@@ -38,24 +38,27 @@ class LoadCatsCommand extends Command {
       },
     });
 
-    input.
-      pipe(parser).
-      pipe(transformer).
-      pipe(upserter).
-      on('close', () => console.log("done")).
-      on('error', (e) => logger.error("upsert failed:", e.message));
+    input
+      .pipe(parser)
+      .pipe(transformer)
+      .pipe(upserter)
+      .on('close', () => console.log('done'))
+      .on('error', (e) => logger.error('upsert failed:', e.message));
   }
 }
 
 LoadCatsCommand.description = `Start the category loader
-`
+`;
 
-LoadCatsCommand.args = [
-  {name: "inputFile", required: true},
-]
+LoadCatsCommand.args = [{ name: 'inputFile', required: true }];
 
 LoadCatsCommand.flags = {
-  development: flags.boolean({char: 'd', env: "DEVELOPMENT", description: 'development mode', default: true}),
-}
+  development: flags.boolean({
+    char: 'd',
+    env: 'DEVELOPMENT',
+    description: 'development mode',
+    default: true,
+  }),
+};
 
-module.exports = LoadCatsCommand
+module.exports = LoadCatsCommand;

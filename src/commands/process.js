@@ -1,4 +1,4 @@
-const { Command, flags } = require('@oclif/command')
+const { Command, flags } = require('@oclif/command');
 const { Database } = require('../database');
 const { Processor } = require('../processor');
 
@@ -7,7 +7,7 @@ const logger = new Logger();
 
 class ProcessCommand extends Command {
   async run() {
-    const {flags, args} = this.parse(ProcessCommand)
+    const { flags, args } = this.parse(ProcessCommand);
 
     const db = new Database(flags.development);
     const processor = new Processor(db);
@@ -28,10 +28,15 @@ class ProcessCommand extends Command {
 }
 
 ProcessCommand.description = `Start the new transaction processor
-`
+`;
 
 ProcessCommand.flags = {
-  development: flags.boolean({char: 'd', env: "DEVELOPMENT", description: 'development mode', default: true}),
-}
+  development: flags.boolean({
+    char: 'd',
+    env: 'DEVELOPMENT',
+    description: 'development mode',
+    default: true,
+  }),
+};
 
-module.exports = ProcessCommand
+module.exports = ProcessCommand;
