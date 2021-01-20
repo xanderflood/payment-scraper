@@ -1,8 +1,6 @@
-'use strict';
-
 module.exports = {
-  up: async (queryInterface, Sequelize) => {
-    const trs_to_delete = await queryInterface.sequelize.query(`
+  up: async (queryInterface) => {
+    await queryInterface.sequelize.query(`
 DELETE FROM transactions WHERE id IN
 ( SELECT id FROM (
     SELECT id,
@@ -16,10 +14,14 @@ DELETE FROM transactions WHERE id IN
 );
 `);
 
-    await queryInterface.sequelize.query(`CREATE UNIQUE INDEX transaction_source_system ON transactions (source_system, source_system_id)`);
+    await queryInterface.sequelize.query(
+      `CREATE UNIQUE INDEX transaction_source_system ON transactions (source_system, source_system_id)`,
+    );
   },
 
-  down: async (queryInterface, Sequelize) => {
-    await queryInterface.sequelize.query(`DROP INDEX transaction_source_system`);
-  }
+  down: async (queryInterface) => {
+    await queryInterface.sequelize.query(
+      `DROP INDEX transaction_source_system`,
+    );
+  },
 };

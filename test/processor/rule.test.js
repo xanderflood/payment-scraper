@@ -1,6 +1,4 @@
-'use strict';
 const assert = require('assert');
-const { compile } = require('../../src/processor')
 
 // Just for comparison
 describe('compile', () => {
