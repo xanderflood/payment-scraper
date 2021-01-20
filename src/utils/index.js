@@ -1,9 +1,9 @@
 function replaceErrors(key, value) {
   if (value instanceof Error) {
-    var error = {};
+    const error = {};
 
-    Object.getOwnPropertyNames(value).forEach(function (key) {
-        error[key] = value[key];
+    Object.getOwnPropertyNames(value).forEach((prop) => {
+      error[prop] = value[prop];
     });
 
     return error;
@@ -13,15 +13,15 @@ function replaceErrors(key, value) {
 }
 
 function errString(error) {
-  return JSON.stringify(error, replaceErrors)
+  return JSON.stringify(error, replaceErrors);
 }
 
-function statsdPath (path) {
+function statsdPath(path) {
   return function (req, res, next) {
-    var method = req.method || 'unknown_method';
+    const method = req.method || 'unknown_method';
     req.statsdKey = ['http', method.toLowerCase(), path].join('.');
     next();
   };
 }
 
-module.exports = { errString, statsdPath }
+module.exports = { errString, statsdPath };
