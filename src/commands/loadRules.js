@@ -1,37 +1,36 @@
-const { Command, flags } = require('@oclif/command');
-const { Database } = require('../database');
+const oclif = require('@oclif/command');
 const csv = require('csv');
 const { createReadStream } = require('fs');
 const { Writable } = require('stream');
 
 const Logger = require('node-json-logger');
+const { Database } = require('../database');
+
 const logger = new Logger();
 
-class LoadRulesCommand extends Command {
+class LoadRulesCommand extends oclif.Command {
   async run() {
     const { flags, args } = this.parse(LoadRulesCommand);
 
-    var input = process.stdin;
-    if (args.inputFile != '-') {
+    let input = process.stdin;
+    if (args.inputFile !== '-') {
       input = createReadStream(args.inputFile);
     }
 
     const db = new Database(flags.development);
 
-    var parser = csv.parse();
+    const parser = csv.parse();
 
-    var transformer = csv.transform({ parallel: 1 }, function (row) {
-      return {
-        type: row[0],
-        field: row[1],
-        catSlug: row[2],
-        string: row[0] == 'regex' ? row[3] : null,
-        number: row[0] == 'numeric' ? parseFloat(row[3]) : null,
-        isTransfer: row[4] == 'true',
-        meta: row[5],
-      };
-    });
-    var upserter = new Writable({
+    const transformer = csv.transform({ parallel: 1 }, (row) => ({
+      type: row[0],
+      field: row[1],
+      catSlug: row[2],
+      string: row[0] === 'regex' ? row[3] : null,
+      number: row[0] === 'numeric' ? parseFloat(row[3]) : null,
+      isTransfer: row[4] === 'true',
+      meta: row[5],
+    }));
+    const upserter = new Writable({
       objectMode: true,
       async write(record, _, next) {
         try {
@@ -47,7 +46,7 @@ class LoadRulesCommand extends Command {
       .pipe(parser)
       .pipe(transformer)
       .pipe(upserter)
-      .on('close', () => console.log('done'))
+      .on('close', () => logger.info('done'))
       .on('error', (e) => logger.error('upsert failed:', e.message));
   }
 }
@@ -58,7 +57,7 @@ LoadRulesCommand.description = `Start the rule loader
 LoadRulesCommand.args = [{ name: 'inputFile', required: true }];
 
 LoadRulesCommand.flags = {
-  development: flags.boolean({
+  development: oclif.flags.boolean({
     char: 'd',
     env: 'DEVELOPMENT',
     description: 'development mode',

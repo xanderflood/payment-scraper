@@ -1,32 +1,31 @@
-const { Command, flags } = require('@oclif/command');
-const { Database } = require('../database');
+const oclif = require('@oclif/command');
 const csv = require('csv');
 const { createReadStream } = require('fs');
 const { Writable } = require('stream');
 
 const Logger = require('node-json-logger');
+const { Database } = require('../database');
+
 const logger = new Logger();
 
-class LoadCatsCommand extends Command {
+class LoadCatsCommand extends oclif.Command {
   async run() {
     const { flags, args } = this.parse(LoadCatsCommand);
 
-    var input = process.stdin;
-    if (args.inputFile != '-') {
+    let input = process.stdin;
+    if (args.inputFile !== '-') {
       input = createReadStream(args.inputFile);
     }
 
     const db = new Database(flags.development);
 
-    var parser = csv.parse();
+    const parser = csv.parse();
 
-    var transformer = csv.transform({ parallel: 1 }, function (row) {
-      return {
-        name: row[0],
-        slug: row[1],
-      };
-    });
-    var upserter = new Writable({
+    const transformer = csv.transform({ parallel: 1 }, (row) => ({
+      name: row[0],
+      slug: row[1],
+    }));
+    const upserter = new Writable({
       objectMode: true,
       async write(record, _, next) {
         try {
@@ -42,7 +41,7 @@ class LoadCatsCommand extends Command {
       .pipe(parser)
       .pipe(transformer)
       .pipe(upserter)
-      .on('close', () => console.log('done'))
+      .on('close', () => logger.info('done'))
       .on('error', (e) => logger.error('upsert failed:', e.message));
   }
 }
@@ -53,7 +52,7 @@ LoadCatsCommand.description = `Start the category loader
 LoadCatsCommand.args = [{ name: 'inputFile', required: true }];
 
 LoadCatsCommand.flags = {
-  development: flags.boolean({
+  development: oclif.flags.boolean({
     char: 'd',
     env: 'DEVELOPMENT',
     description: 'development mode',

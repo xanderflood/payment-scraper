@@ -1,13 +1,13 @@
-const { Command, flags } = require('@oclif/command');
+const oclif = require('@oclif/command');
+const Logger = require('node-json-logger');
 const { Database } = require('../database');
 const { Processor } = require('../processor');
 
-const Logger = require('node-json-logger');
 const logger = new Logger();
 
-class ProcessCommand extends Command {
+class ProcessCommand extends oclif.Command {
   async run() {
-    const { flags, args } = this.parse(ProcessCommand);
+    const { flags } = this.parse(ProcessCommand);
 
     const db = new Database(flags.development);
     const processor = new Processor(db);
@@ -22,7 +22,6 @@ class ProcessCommand extends Command {
       await processor.processTransactions();
     } catch (e) {
       logger.error(`failed processing transactions - aborting`, e);
-      return;
     }
   }
 }
@@ -31,7 +30,7 @@ ProcessCommand.description = `Start the new transaction processor
 `;
 
 ProcessCommand.flags = {
-  development: flags.boolean({
+  development: oclif.flags.boolean({
     char: 'd',
     env: 'DEVELOPMENT',
     description: 'development mode',

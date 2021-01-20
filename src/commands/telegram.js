@@ -1,11 +1,11 @@
-const { Command, flags } = require('@oclif/command');
+const oclif = require('@oclif/command');
+const Logger = require('node-json-logger');
 const { Database } = require('../database');
 const { Bot } = require('../telegram');
 
-const Logger = require('node-json-logger');
 const logger = new Logger();
 
-class TelegramCommand extends Command {
+class TelegramCommand extends oclif.Command {
   async run() {
     const { flags } = this.parse(TelegramCommand);
 
@@ -21,20 +21,20 @@ TelegramCommand.description = `Start the telegram bot
 `;
 
 TelegramCommand.flags = {
-  botAPIToken: flags.string({
+  botAPIToken: oclif.flags.string({
     char: 't',
     env: 'TELEGRAM_BOT_API_TOKEN',
     description: 'Telegram Bot API token',
     required: true,
   }),
-  botAPIChatID: flags.string({
+  botAPIChatID: oclif.flags.string({
     char: 'c',
     env: 'TELEGRAM_BOT_API_CHAT_ID',
     description:
       'Telegram Bot API chat ID (TODO: cache these from a DB table by user ID instead)',
     required: true,
   }),
-  development: flags.boolean({
+  development: oclif.flags.boolean({
     char: 'd',
     env: 'DEVELOPMENT',
     description: 'development mode',
