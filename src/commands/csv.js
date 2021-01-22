@@ -1,19 +1,20 @@
-const { Command, flags } = require('@oclif/command')
-const { Database } = require ('../database');
-const { TransactionParser } = require('../csv')
+const oclif = require('@oclif/command');
 const csv = require('csv');
 const { createReadStream, createWriteStream } = require('fs');
 const { Transform, Writable } = require('stream');
 
 const Logger = require('node-json-logger');
+const { TransactionParser } = require('../csv');
+const { Database } = require('../database');
+
 const logger = new Logger();
 
-class CSVCommand extends Command {
+class CSVCommand extends oclif.Command {
   async run() {
-    const {flags, args} = this.parse(CSVCommand)
+    const { flags, args } = this.parse(CSVCommand);
 
-    var input = process.stdin
-    if (args.inputFile != '-') {
+    let input = process.stdin;
+    if (args.inputFile !== '-') {
       input = createReadStream(args.inputFile);
     }
 
@@ -24,14 +25,12 @@ class CSVCommand extends Command {
 
     const transactionParser = new TransactionParser();
 
-    const records = input
-      .pipe(csvParser)
-      .pipe(transactionParser);
+    const records = input.pipe(csvParser).pipe(transactionParser);
 
-    var pipeline;
+    let pipeline;
     if (flags.postgres) {
       const db = new Database(flags.development);
-      var upserter = new Writable({
+      const upserter = new Writable({
         objectMode: true,
         async write(record, _, next) {
           try {
@@ -43,20 +42,18 @@ class CSVCommand extends Command {
         },
       });
 
-      pipeline = records.
-        pipe(upserter).
-        on('close', db.close);
+      pipeline = records.pipe(upserter).on('close', db.close);
     } else {
       const stringifier = csv.stringify({
         header: !flags.noOutputHeader,
         parallel: 1,
         columns: [
-          "source_system",
-          "source_system_id",
-          "merchant",
-          "transaction_date",
-          "amount",
-          "notes",
+          'source_system',
+          'source_system_id',
+          'merchant',
+          'transaction_date',
+          'amount',
+          'notes',
         ],
       });
 
@@ -64,32 +61,46 @@ class CSVCommand extends Command {
         ? createWriteStream(args.outputFile)
         : process.stdout;
 
-      pipeline = records.
-        pipe(outputRowProcessor()).
-        pipe(stringifier).
-        pipe(output);
+      pipeline = records
+        .pipe(outputRowProcessor())
+        .pipe(stringifier)
+        .pipe(output);
     }
 
-    pipeline.
-      on('error', (e) => logger.error("upsert failed:", e.message));
+    pipeline.on('error', (e) => logger.error('upsert failed:', e.message));
   }
 }
 
 CSVCommand.description = `Ingest or process a CSV file
-`
+`;
 
 CSVCommand.args = [
-  {name: "inputFile", required: true},
-  {name: "outputFile"},
-]
+  { name: 'inputFile', required: true },
+  { name: 'outputFile' },
+];
 
 CSVCommand.flags = {
-  postgres: flags.boolean({char: 'p', env: "POSTGRES", description: 'Output to postgres instead of file - use ambient configuration', default: false}),
-  noOutputHeader: flags.boolean({char: 'n', description: 'omit the header row from output', default: true}),
-  development: flags.boolean({char: 'd', env: "DEVELOPMENT", description: 'development mode', default: true}),
-}
+  postgres: oclif.flags.boolean({
+    char: 'p',
+    env: 'POSTGRES',
+    description:
+      'Output to postgres instead of file - use ambient configuration',
+    default: false,
+  }),
+  noOutputHeader: oclif.flags.boolean({
+    char: 'n',
+    description: 'omit the header row from output',
+    default: true,
+  }),
+  development: oclif.flags.boolean({
+    char: 'd',
+    env: 'DEVELOPMENT',
+    description: 'development mode',
+    default: true,
+  }),
+};
 
-module.exports = CSVCommand
+module.exports = CSVCommand;
 
 function outputRowProcessor() {
   return new Transform({
@@ -97,11 +108,11 @@ function outputRowProcessor() {
     async transform(object, _, next) {
       if (object.isTransfer) {
         next();
-        return
+        return;
       }
 
-      return next(null, [
-        `${object.sourceSystem}|${object.sourceSystemId || ""}`,
+      next(null, [
+        `${object.sourceSystem}|${object.sourceSystemId || ''}`,
         object.merchant,
         object.transactionDate,
         -object.amount,
