@@ -25,6 +25,8 @@ class Rollupper {
       throw error;
     }
 
+    if (transactions.length === 0) return;
+
     const totalsByCategory = {};
     let weight;
     for (let i = transactions.length - 1; i >= 0; i--) {
