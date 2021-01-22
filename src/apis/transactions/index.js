@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const bodyParser = require('body-parser');
 const Logger = require('node-json-logger');
+const { DateTime } = require('luxon');
 const { errString, statsdPath } = require('../../utils');
 
 const logger = new Logger();
@@ -43,6 +44,11 @@ class TransactionServer {
       '/rollups',
       statsdPath('transaction_rollups'),
       this.buildRecentRollups.bind(this),
+    );
+    this.router.get(
+      '/rollups/recent',
+      statsdPath('transaction_rollups_recent'),
+      this.getRecentRollups.bind(this),
     );
   }
 
@@ -110,12 +116,14 @@ class TransactionServer {
     if (
       typeof request.body.trShortId !== 'string' ||
       !request.body.trShortId.length ||
-      typeof request.body.catSlug !== 'string' ||
-      !request.body.catSlug.length
+      ((typeof request.body.catSlug !== 'string' ||
+        !request.body.catSlug.length) &&
+        typeof request.body.isTransfer !== 'boolean')
     ) {
-      response
-        .status(400)
-        .json({ error: "fields 'trShortId' and 'catSlug' are required" });
+      response.status(400).json({
+        error:
+          "you must provide 'trShortId' and one of 'catSlug' or 'isTransfer'",
+      });
       return;
     }
     if (!!request.body.notes && typeof request.body.notes !== 'string') {
@@ -125,23 +133,35 @@ class TransactionServer {
       return;
     }
 
-    let cat;
-    try {
-      cat = await this.database.categorizeTransaction(
-        request.body.trShortId,
-        request.body.catSlug,
-        request.body.notes,
-      );
-    } catch (error) {
-      logger.error(
-        'error categorizing transaction - responding with 500',
-        error,
-      );
-      response.status(500).json({ error: errString(error) });
-      return;
+    if (request.body.isTransfer) {
+      try {
+        await this.database.markAsTransfer(request.body.trShortId);
+      } catch (error) {
+        logger.error(
+          'error categorizing transaction - responding with 500',
+          error,
+        );
+        response.status(500).json({ error: errString(error) });
+        return;
+      }
+    } else {
+      try {
+        await this.database.categorizeTransaction(
+          request.body.trShortId,
+          request.body.catSlug,
+          request.body.notes,
+        );
+      } catch (error) {
+        logger.error(
+          'error categorizing transaction - responding with 500',
+          error,
+        );
+        response.status(500).json({ error: errString(error) });
+        return;
+      }
     }
 
-    response.json(cat);
+    response.json({ message: 'success' });
   }
 
   async process(request, response) {
@@ -170,12 +190,34 @@ class TransactionServer {
     response.json({ status: 200, message: 'success' });
   }
 
+  async getRecentRollups(request, response) {
+    const endDate = DateTime.local();
+    const startDate = endDate.minus({ years: 1 });
+
+    let rollups;
+    try {
+      rollups = await this.database.getRollupsForPeriod(
+        startDate.toJSDate(),
+        endDate.toJSDate(),
+      );
+    } catch (error) {
+      logger.error(
+        'error getting rollups - responding with 500',
+        errString(error),
+      );
+      response.status(500).json({ error: errString(error) });
+      return;
+    }
+
+    response.json({ status: 200, message: 'success', result: rollups });
+  }
+
   async buildRecentRollups(request, response) {
     try {
       await this.rollupper.rollupRecentMonths();
     } catch (error) {
       logger.error(
-        'error building rollups transaction - responding with 500',
+        'error building rollups - responding with 500',
         errString(error),
       );
       response.status(500).json({ error: errString(error) });

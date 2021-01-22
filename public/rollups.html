@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Blue House</title>
+
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" type="text/css" href="./static/style.css" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body>
+  <table id="rollups_table" class="display" style="width:100%"></table>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+  <script src="https://datatables.net/download/build/nightly/jquery.dataTables.js"></script>
+  <script type="text/javascript">
+    var userCategories;
+    $(function () {
+      fetchCategories(refreshTable);
+    });
+
+    function fetchCategories(then) {
+      $.get("/api/transactions/categories")
+        .done(function (resp) {
+          userCategories = resp.data;
+          then();
+        })
+        .fail(function (err) {
+          alert("Failed fetching categories");
+        });
+    }
+
+    function refreshTable() {
+      $.get("/api/transactions/rollups/recent")
+        .done(function (resp) {
+          var columns = [{ title: "Category", data: 0 }], data = [];
+          var rowsByCategoryID = { "null": 0 };
+          const nullRow = ["N/A"];
+          for (var i = resp.result.length - 1; i >= 0; i--) {
+            const cat = userCategories[resp.result[i].cat]
+            columns.push({
+              title: resp.result[i].month_start,
+              render: $.fn.dataTable.render.number( ',', '.', 2, '$' ),
+              defaultContent: '$0.00',
+            });
+
+            nullRow.push(resp.result[i].rollup["null"]);
+          }
+
+          for (var j = userCategories.length - 1; j >= 0; j--) {
+            const catObj = userCategories[j];
+            var row = [catObj.name];
+            for (var i = resp.result.length - 1; i >= 0; i--) {
+              const rollup = resp.result[i].rollup;
+              row.push(rollup[catObj.id] || 0);
+            }
+
+            data.push(row);
+          }
+
+          $('#rollups_table').DataTable({
+            columns: columns,
+            data: data,
+            pageLength: -1,
+          });
+        })
+        .fail(function () {
+          alert("Failed fetching rollups");
+        });
+    }
+  </script>
+</body>
+</html>

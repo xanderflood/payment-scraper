@@ -36,9 +36,9 @@ class Database {
     return this.models.Category.create(attrs);
   }
 
-  async categorizeTransaction(trSId, catSlug, notes = '') {
+  async categorizeTransaction(trId, catSlug, notes = '') {
     // allow full UUIDs as well
-    const trShortId = trShortId.slice(0, 5);
+    const trShortId = trId.slice(0, 5);
 
     const cats = await this.models.Category.findAll({
       where: { slug: catSlug },
@@ -48,6 +48,20 @@ class Database {
 
     const transactions = await this.models.Transaction.update(
       { isProcessed: true, categoryId: catId, notes },
+      { where: { shortId: trShortId } },
+    );
+    if (transactions.length < 1)
+      throw new RecordNotFoundError('transaction', trShortId);
+
+    return transactions[0];
+  }
+
+  async markAsTransfer(trId) {
+    // allow full UUIDs as well
+    const trShortId = trId.slice(0, 5);
+
+    const transactions = await this.models.Transaction.update(
+      { isProcessed: true, isTransfer: true },
       { where: { shortId: trShortId } },
     );
     if (transactions.length < 1)
@@ -256,6 +270,18 @@ WHERE (amortize IS NULL
       monthStart: startMoment,
       rollup,
     });
+  }
+
+  async getRollupsForPeriod(startMoment, endMoment) {
+    const start = formatDate(startMoment);
+    const end = formatDate(endMoment);
+
+    return (
+      await this.models.sequelize.query(`
+SELECT * FROM rollups
+WHERE daterange(${start}, ${end}) @> month_start::date
+`)
+    )[0];
   }
 }
 

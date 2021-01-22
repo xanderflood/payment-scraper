@@ -12,7 +12,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 </head>
 <body>
-  <div id="cateogize_panel" class="panel panel-default">
+  <div id="categorize_panel" class="panel panel-default">
     <div class="panel-heading">
       <a data-toggle="collapse" href="#categorize_collapse"><h3>Categorize</h3></a>
     </div>
@@ -35,6 +35,7 @@
         <th>Merchant</th>
         <th>Amount</th>
         <th>Notes</th>
+        <th></th>
       </tr>
     </thead>
     <tfoot>
@@ -44,6 +45,7 @@
         <th>Merchant</th>
         <th>Amount</th>
         <th>Notes</th>
+        <th></th>
       </tr>
     </tfoot>
   </table>
@@ -54,19 +56,24 @@
   <script src="https://cdn.datatables.net/select/1.3.1/js/dataTables.select.min.js"></script>
   <script type="text/javascript">
     $(function() {
-      $('#transaction_table').DataTable({
+      var table = $('#transaction_table').DataTable({
         ajax: "/api/transactions/unprocessed",
         select: "multiple",
         columns: [
           { data: "shortId" },
-          { data: "transactionDate" },
+          { data: "transactionDate",
+            render: function(data) { return data.split('T')[0]; } },
           { data: "merchant" },
-          { data: "amount" },
+          { data: "amount",
+            render: $.fn.dataTable.render.number( ',', '.', 2, '$' ) },
           { data: "notes" },
+          { render: function(data, type, row) {
+              return '<button class="transfer-button" data-transaction-id="'+row.id+'">Transfer</button>';
+            },
+          },
         ]
       } );
 
-      var table = $('#transaction_table').DataTable();
       var slugSelect = $('#cat_slug');
       var form = $('#categorize_form');
 
@@ -75,19 +82,13 @@
       });
    
       form.submit(function (e) {
-        console.log("callback");
         e.preventDefault();
-        console.log("1");
         var selected = table.rows('.selected').data();
         var slug = slugSelect.val();
 
-        console.log("2");
         // TODO disable button
         for (var i = selected.length - 1; i >= 0; i--) {
-        console.log("3");
           // TODO perform in serial, then re-enable the button
-          console.log("slug", slug)
-          console.log("sel", selected[i])
           $.ajax({
             type: "POST",
             url: "/api/transactions/categorize",
@@ -107,6 +108,29 @@
         }
 
         return false;
+      });
+
+      $("#transaction_table").on('click', 'button.transfer-button', function (e) {
+        const trid = $(this).data().transactionId;
+        e.stopPropagation();
+        e.preventDefault();
+
+        $.ajax({
+          type: "POST",
+          url: "/api/transactions/categorize",
+          data: JSON.stringify({
+            trShortId: trid,
+            isTransfer: true,
+          }),
+          contentType: "application/json; charset=utf-8",
+          dataType: "json",
+          success: function () {
+            table.ajax.reload(null, false);
+          },
+          error: function () {
+            alert("Failed marking transaction as transfer");
+          },
+        });
       });
     });
 
