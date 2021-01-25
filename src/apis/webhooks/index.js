@@ -6,8 +6,6 @@ const { JWK } = require('node-jwk');
 const compare = require('secure-compare');
 const sha256 = require('js-sha256');
 const Logger = require('node-json-logger');
-const amqp = require('amqplib');
-const { errString } = require('../../utils');
 
 const logger = new Logger();
 

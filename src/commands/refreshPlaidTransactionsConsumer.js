@@ -2,10 +2,10 @@ const oclif = require('@oclif/command');
 const plaid = require('plaid');
 const Logger = require('node-json-logger');
 const amqp = require('amqplib');
-const statsd = require('statsd-client');
+const Statsd = require('statsd-client');
 const { Database } = require('../database');
 const { PlaidManager } = require('../plaid');
-const { errString } = require('../../utils');
+const { errString } = require('../utils');
 
 class RefreshPlaidTransactionsConsumerCommand extends oclif.Command {
   async run() {
@@ -16,11 +16,11 @@ class RefreshPlaidTransactionsConsumerCommand extends oclif.Command {
       secret: flags.secret,
       env: plaid.environments[flags.plaidEnv],
     });
-    const stats = new statsd();
+    const statsd = new Statsd();
+    const msgStats = statsd.getChildClient('plaid_refresh_consumer');
     const logger = new Logger();
     const db = new Database(flags.development);
-    const app = new WebhookServer(flags.port, db, plaidClient);
-    const pm = new PlaidManager(plaidClient, db, stats);
+    const pm = new PlaidManager(plaidClient, db, statsd);
 
     const conn = await amqp.connect(flags.amqpAddress);
     const ch = await conn.createChannel();

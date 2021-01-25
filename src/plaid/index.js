@@ -1,6 +1,5 @@
 const { DateTime } = require('luxon');
 const Logger = require('node-json-logger');
-const { errString } = require('../../utils');
 
 const logger = new Logger();
 
@@ -17,18 +16,7 @@ class PlaidManager {
       lookback_days: lookbackDays,
     });
 
-    let acct;
-    try {
-      acct = await database.getSyncedAccount('PLAID', itemId);
-    } catch (error) {
-      logger.error(
-        'error fetching account credentials from DB - responding with 500',
-        errString(error),
-      );
-
-      response.status(500).json({});
-      return;
-    }
+    const acct = await this.database.getSyncedAccount('PLAID', itemId);
 
     const today = DateTime.local();
     const endDate = today.toFormat('yyyy-MM-dd');
@@ -41,25 +29,15 @@ class PlaidManager {
     let totalRecords = 0;
     const plaidAccountsReference = {};
     while (true) {
-      let trResponse;
-      try {
-        trResponse = await this.client.getTransactions(
-          acct.sourceSystemAuth.access_token,
-          startDate,
-          endDate,
-          {
-            count: 250,
-            offset: totalRecords,
-          },
-        );
-      } catch (error) {
-        logger.error(
-          'error fetching transactions from Plaid - responding with 500',
-          errString(error),
-        );
-        response.status(500).json({});
-        return;
-      }
+      const trResponse = await this.client.getTransactions(
+        acct.sourceSystemAuth.access_token,
+        startDate,
+        endDate,
+        {
+          count: 250,
+          offset: totalRecords,
+        },
+      );
 
       if (trResponse.transactions.length === 0) break;
 
@@ -74,53 +52,35 @@ class PlaidManager {
       logger.info(`upserting ${trResponse.transactions.length} transactions`);
       for (let i = trResponse.transactions.length - 1; i >= 0; i--) {
         const tr = trResponse.transactions[i];
-        try {
-          await this.database.upsertSyncedTransaction({
-            sourceSystem: 'PLAID',
-            syncedAccountId: acct.id,
-            sourceSystemId: tr.transaction_id,
-            sourceSystemMeta: tr,
+        await this.database.upsertSyncedTransaction({
+          sourceSystem: 'PLAID',
+          syncedAccountId: acct.id,
+          sourceSystemId: tr.transaction_id,
+          sourceSystemMeta: tr,
 
-            transactionDate: tr.date,
-            merchant: tr.merchant_name,
-            amount: tr.amount,
-            institution: plaidAccountsReference[tr.account_id].name,
-            notes: tr.name,
-          });
-          this.stats.increment('plaid_transaction_upserted');
-        } catch (error) {
-          logger.error(
-            'error saving transactions to DB - carrying on',
-            errString(error),
-          );
-        }
+          transactionDate: tr.date,
+          merchant: tr.merchant_name,
+          amount: tr.amount,
+          institution: plaidAccountsReference[tr.account_id].name,
+          notes: tr.name,
+        });
+        this.stats.increment('plaid_transaction_upserted');
       }
     }
 
     this.stats.increment('successful_plaid_refresh');
-    response.json({});
   }
 
   async deletePlaidTransactions(plaidTransactionIds) {
     for (let i = plaidTransactionIds.length - 1; i >= 0; i--) {
-      try {
-        await this.database.deleteSourceSystemTransaction(
-          'PLAID',
-          plaidTransactionIds[i],
-        );
-        this.stats.increment('transaction_revoked');
-      } catch (error) {
-        logger.error(
-          'error deleting transaction - responding with 500',
-          errString(error),
-        );
-        response.status(500).json({});
-        return;
-      }
+      await this.database.deleteSourceSystemTransaction(
+        'PLAID',
+        plaidTransactionIds[i],
+      );
+      this.stats.increment('transaction_revoked');
     }
 
     this.stats.increment('successful_revocation');
-    response.json({});
   }
 }
 

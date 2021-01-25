@@ -1,8 +1,6 @@
 const oclif = require('@oclif/command');
-const plaid = require('plaid');
 const Logger = require('node-json-logger');
 const amqp = require('amqplib');
-const { Database } = require('../database');
 const { WebhookServer } = require('../apis/webhooks');
 
 const logger = new Logger();
@@ -10,13 +8,6 @@ const logger = new Logger();
 class WebhookAPICommand extends oclif.Command {
   async run() {
     const { flags } = this.parse(WebhookAPICommand);
-
-    const plaidClient = new plaid.Client({
-      clientID: flags.clientID,
-      secret: flags.secret,
-      env: plaid.environments[flags.plaidEnv],
-    });
-    const db = new Database(flags.development);
 
     const conn = await amqp.connect(flags.amqpAddress);
     const channel = await conn.createChannel();
