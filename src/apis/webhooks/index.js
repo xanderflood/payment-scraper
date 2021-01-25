@@ -5,19 +5,18 @@ const cacheManager = require('cache-manager');
 const { JWK } = require('node-jwk');
 const compare = require('secure-compare');
 const sha256 = require('js-sha256');
-const { DateTime } = require('luxon');
 const Logger = require('node-json-logger');
+const amqp = require('amqplib');
 const { errString } = require('../../utils');
 
 const logger = new Logger();
 
 class WebhookServer {
-  constructor(port, database, plaid) {
+  constructor(port, publishRefresh, publishRevoke) {
     this.port = port;
     this.app = express();
-    this.database = database;
-    this.client = plaid;
 
+    // TODO incorporate caching
     this.keyCache = cacheManager.caching({ store: 'memory', max: 256 });
 
     this.app.post(
@@ -34,118 +33,18 @@ class WebhookServer {
         }
 
         if (WebhookServer.shouldRemoveTransactions(request.body.webhook_code)) {
-          const nTr = request.body.removed_transactions.length;
-          for (let i = nTr - 1; i >= 0; i--) {
-            try {
-              await this.database.deleteSourceSystemTransaction(
-                'PLAID',
-                request.body.removed_transactions[i],
-              );
-            } catch (error) {
-              logger.error(
-                'error deleting transaction - responding with 500',
-                errString(error),
-              );
-              response.status(500).json({});
-              return;
-            }
-          }
-
-          response.json({});
-          return;
-        }
-        if (WebhookServer.shouldSaveTransactions(request.body.webhook_code)) {
-          logger.info('upserting transactions', {
-            plaid_item_id: request.body.webhook_code,
+          publishRevoke({
+            plaid_transaction_ids: request.body.removed_transactions,
           });
-          let acct;
-          try {
-            acct = await database.getSyncedAccount(
-              'PLAID',
-              request.body.item_id,
-            );
-          } catch (error) {
-            logger.error(
-              'error fetching account credentials from DB - responding with 500',
-              errString(error),
-            );
-            response.status(500).json({});
-            return;
-          }
-
-          const today = DateTime.local();
-          const endDate = today.toFormat('yyyy-MM-dd');
-          const startDate = today
-            .minus({
-              days: WebhookServer.lookbackDaysForCode(
-                request.body.webhook_code,
-              ),
-            })
-            .toFormat('yyyy-MM-dd');
-
-          let totalRecords = 0;
-          const plaidAccountsReference = {};
-          while (true) {
-            let trResponse;
-            try {
-              // TODO add some retrying - or switch to an event framework?
-              trResponse = await this.client.getTransactions(
-                acct.sourceSystemAuth.access_token,
-                startDate,
-                endDate,
-                {
-                  count: 250,
-                  offset: totalRecords,
-                },
-              );
-            } catch (error) {
-              logger.error(
-                'error fetching transactions from Plaid - responding with 500',
-                errString(error),
-              );
-              response.status(500).json({});
-              return;
-            }
-
-            if (trResponse.transactions.length === 0) break;
-
-            totalRecords += trResponse.transactions.length;
-
-            for (let i = trResponse.accounts.length - 1; i >= 0; i--) {
-              const plaidAcct = trResponse.accounts[i];
-              plaidAccountsReference[plaidAcct.account_id] =
-                plaidAccountsReference[plaidAcct.account_id] || plaidAcct;
-            }
-
-            logger.info(
-              `upserting ${trResponse.transactions.length} transactions`,
-            );
-            for (let i = trResponse.transactions.length - 1; i >= 0; i--) {
-              // TODO stats alerting for errors
-              const tr = trResponse.transactions[i];
-              try {
-                await this.database.upsertSyncedTransaction({
-                  sourceSystem: 'PLAID',
-                  syncedAccountId: acct.id,
-                  sourceSystemId: tr.transaction_id,
-                  sourceSystemMeta: tr,
-
-                  transactionDate: tr.date,
-                  merchant: tr.merchant_name,
-                  amount: tr.amount,
-                  institution: plaidAccountsReference[tr.account_id].name,
-                  notes: tr.name,
-                });
-              } catch (error) {
-                logger.error(
-                  'error saving transactions to DB - carrying on',
-                  errString(error),
-                );
-              }
-            }
-          }
-
-          response.json({});
+        } else if (
+          WebhookServer.shouldRefreshTransactions(request.body.webhook_code)
+        ) {
+          publishRefresh({
+            item_id: request.body.item_id,
+            lookback_days: WebhookServer.lookbackDaysForCode(
+              request.body.webhook_code,
+            ),
+          });
         } else {
           logger.error(
             'unrecognized plaid webhook code - responding with 200 to ignore:',
@@ -157,7 +56,7 @@ class WebhookServer {
     );
   }
 
-  static shouldSaveTransactions(webhookCode) {
+  static shouldRefreshTransactions(webhookCode) {
     return (
       webhookCode === 'INITIAL_UPDATE' ||
       webhookCode === 'HISTORICAL_UPDATE' ||
