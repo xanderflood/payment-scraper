@@ -44,19 +44,19 @@ WebhookAPICommand.description = `Start the webhook API server
 `;
 
 WebhookAPICommand.flags = {
-  amqpAddress: oclif.flags.integer({
+  amqpAddress: oclif.flags.string({
     char: 'a',
     env: 'AMQP_ADDRESS',
     description: 'address of the AMQP server to use',
     required: true,
   }),
-  refreshQueueName: oclif.flags.integer({
+  refreshQueueName: oclif.flags.string({
     char: 'a',
     env: 'REFRESH_QUEUE_NAME',
     description: 'name of the AMQP queue from which to consume refresh events',
     default: 'refresh-plaid-transactions',
   }),
-  revokeQueueName: oclif.flags.integer({
+  revokeQueueName: oclif.flags.string({
     char: 'a',
     env: 'REVOKE_QUEUE_NAME',
     description: 'name of the AMQP queue from which to consume revoke events',
