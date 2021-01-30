@@ -39,7 +39,12 @@ class WebhookAPICommand extends oclif.Command {
       );
     };
 
-    const app = new WebhookServer(flags.port, plaidClient, publishRefresh, publishRevoke);
+    const app = new WebhookServer(
+      flags.port,
+      plaidClient,
+      publishRefresh,
+      publishRevoke,
+    );
 
     logger.info('starting webhook API...');
     app.start();
@@ -90,7 +95,11 @@ WebhookAPICommand.flags = {
     env: 'PLAID_SECRET',
     required: true,
   }),
-  plaidEnv: oclif.flags.string({ char: 'e', env: 'PLAID_ENV', default: 'sandbox' }),
+  plaidEnv: oclif.flags.string({
+    char: 'e',
+    env: 'PLAID_ENV',
+    default: 'sandbox',
+  }),
 };
 
 module.exports = WebhookAPICommand;
