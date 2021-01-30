@@ -10,9 +10,10 @@ const Logger = require('node-json-logger');
 const logger = new Logger();
 
 class WebhookServer {
-  constructor(port, publishRefresh, publishRevoke) {
+  constructor(port, plaid, publishRefresh, publishRevoke) {
     this.port = port;
     this.app = express();
+    this.plaid = plaid;
 
     // TODO incorporate caching
     this.keyCache = cacheManager.caching({ store: 'memory', max: 256 });
@@ -99,7 +100,7 @@ class WebhookServer {
   }
 
   async getPlaidWebhookJWTKeyByID(kid) {
-    const resp = await this.client.getWebhookVerificationKey(kid);
+    const resp = await this.plaid.getWebhookVerificationKey(kid);
     return JWK.fromObject(resp.key).key.toPublicKeyPEM();
   }
 
