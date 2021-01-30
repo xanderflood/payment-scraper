@@ -69,7 +69,7 @@ RefreshPlaidTransactionsConsumerCommand.flags = {
     char: 'a',
     env: 'REFRESH_QUEUE_NAME',
     description: 'name of the AMQP queue from which to consume refresh events',
-    default: 'revoke-plaid-transactions',
+    default: 'refresh-plaid-transactions',
   }),
   clientID: oclif.flags.string({
     char: 'i',
