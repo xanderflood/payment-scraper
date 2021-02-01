@@ -29,7 +29,7 @@ class PlaidManager {
     let totalRecords = 0;
     const plaidAccountsReference = {};
     while (true) {
-      const trResponse = await this.client.getTransactions(
+      const trResponse = await this.plaid.getTransactions(
         acct.sourceSystemAuth.access_token,
         startDate,
         endDate,

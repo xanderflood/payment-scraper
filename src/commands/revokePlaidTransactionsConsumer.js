@@ -30,6 +30,7 @@ class RefreshPlaidTransactionsConsumerCommand extends oclif.Command {
     ch.prefetch(1);
     ch.consume(flags.revokeQueueName, async (msg) => {
       const msgObj = JSON.parse(msg.content);
+      msgStats.increment('revoke_msg_received');
       if (
         typeof msgObj.plaid_transaction_ids !== 'string' ||
         !msgObj.plaid_transaction_ids.length
@@ -38,7 +39,7 @@ class RefreshPlaidTransactionsConsumerCommand extends oclif.Command {
         return;
       }
 
-      msgStats.increment('revoke_msg_received');
+      logger.info(msgObj);
       try {
         await pm.deletePlaidTransactions(msgObj.plaid_transaction_ids);
       } catch (error) {

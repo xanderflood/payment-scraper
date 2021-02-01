@@ -30,10 +30,7 @@ class RefreshPlaidTransactionsConsumerCommand extends oclif.Command {
     ch.prefetch(1);
     ch.consume(flags.refreshQueueName, async (msg) => {
       const msgObj = JSON.parse(msg.content);
-      logger.info(msgObj);
-      // logger.info(typeof msg.item_id !== 'string');
-      // logger.info(!msg.item_id.length);
-      // logger.info(typeof msg.lookback_days !== 'number');
+      msgStats.increment('refresh_msg_received');
       if (
         typeof msgObj.item_id !== 'string' ||
         !msgObj.item_id.length ||
@@ -44,12 +41,11 @@ class RefreshPlaidTransactionsConsumerCommand extends oclif.Command {
         return;
       }
 
-      msgStats.increment('refresh_msg_received');
-      logger.info('statsing');
+      logger.info(msgObj);
       try {
         await pm.pullRecentTransactions(msgObj.item_id, msgObj.lookback_days);
       } catch (error) {
-        logger.error('failed revoking plaid transactions', {
+        logger.error('failed refreshing plaid transactions', {
           error: errString(error),
         });
         logger.info('reject');
