@@ -31,8 +31,8 @@ class RefreshPlaidTransactionsConsumerCommand extends oclif.Command {
     ch.consume(flags.revokeQueueName, async (msg) => {
       const msgObj = JSON.parse(msg.content);
       if (
-        typeof msg.plaid_transaction_ids !== 'string' ||
-        !msg.plaid_transaction_ids.length
+        typeof msgObj.plaid_transaction_ids !== 'string' ||
+        !msgObj.plaid_transaction_ids.length
       ) {
         ch.reject(msg, false);
         return;
