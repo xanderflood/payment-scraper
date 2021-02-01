@@ -30,7 +30,6 @@ class RefreshPlaidTransactionsConsumerCommand extends oclif.Command {
     ch.prefetch(1);
     ch.consume(flags.revokeQueueName, async (msg) => {
       const msgObj = JSON.parse(msg.content);
-      console.log('TODO remove', msgObj);
       if (
         typeof msg.plaid_transaction_ids !== 'string' ||
         !msg.plaid_transaction_ids.length
