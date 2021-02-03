@@ -47,7 +47,7 @@ class PlaidServer {
   }
 
   async refreshAllItems(request, response) {
-    var days;
+    let days;
     try {
       days = Number(request.body.lookback_days);
     } catch (error) {
@@ -55,7 +55,7 @@ class PlaidServer {
       response.status(400).json({ error });
     }
 
-    var accts;
+    let accts;
     try {
       accts = await this.database.getPlaidSyncedAccounts();
     } catch (error) {
@@ -67,9 +67,9 @@ class PlaidServer {
       return;
     }
 
-    for (var i = accts.length - 1; i >= 0; i--) {
+    for (let i = accts.length - 1; i >= 0; i--) {
       // TODO remove
-      console.log({
+      logger.info({
         item_id: accts.item_id,
         lookback_days: days,
       });

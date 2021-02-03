@@ -231,7 +231,7 @@ class Database {
   }
 
   async getPlaidSyncedAccounts() {
-    return await this.models.SyncedAccount.findAll({
+    return this.models.SyncedAccount.findAll({
       where: { sourceSystem: 'PLAID' },
     });
   }
