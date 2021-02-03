@@ -4,10 +4,15 @@
     <meta charset="UTF-8" />
     <title>Blue House</title>
 
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css"
+    />
     <link rel="stylesheet" href="https://threads.plaid.com/threads.css" />
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
     <link rel="stylesheet" type="text/css" href="./static/style.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+
   </head>
 
   <body>
@@ -81,6 +86,19 @@
             <div class="panel-body">
               <form method="POST" action="/api/transactions/rollups" enctype="application/json">
                 <input text="Total recent transactions" type="submit">
+              </form>
+            </div>
+          </div>
+
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <a data-toggle="collapse" href="#refresh_collapse"><h2>Refresh Plaid Transactions</h2></a>
+            </div>
+            <div class="panel-body">
+              <form id="refresh_form">
+                <label>Number of days:</label>
+                <input type="number" value="7" step="1" min="1" max="180" name="lookback_days" id="lookback_days">
+                <input text="Refresh" type="submit">
               </form>
             </div>
           </div>
@@ -736,6 +754,28 @@
               $(this).html(html).slideDown();
             });
           });
+        });
+
+        // Refresh form
+        $("#refresh_form").submit(function (e) {
+          e.preventDefault();
+
+          $.post(
+            "/api/plaid/refresh_all_items",
+            {
+              lookback_days: $("#lookback_days").val()
+            },
+            function (data) {
+              $("#item_id").text(data.item_id);
+              $("#access_token").text(data.access_token);
+              $("#intro").hide();
+              $("#app, #steps").fadeIn("slow");
+            },
+            function (error) {
+              // TODO https://getbootstrap.com/docs/4.3/components/toasts/#javascript-behavior
+              console.log(error)
+            }
+          );
         });
       }
       $.post("/api/plaid/info", {}, function (result) {

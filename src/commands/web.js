@@ -2,6 +2,7 @@ const oclif = require('@oclif/command');
 const express = require('express');
 const plaid = require('plaid');
 const expressStatsd = require('express-statsd');
+const amqp = require('amqplib');
 const Logger = require('node-json-logger');
 const { Database } = require('../database');
 const { Processor } = require('../processor');
@@ -31,8 +32,28 @@ class WebCommand extends oclif.Command {
     const processor = new Processor(database);
     const rollupper = new Rollupper(database);
 
+    const conn = await amqp.connect(flags.amqpAddress);
+    const channel = await conn.createChannel();
+    await channel.assertQueue(flags.revokeQueueName);
+    await channel.assertQueue(flags.refreshQueueName);
+
+    const publishRefresh = function (msg) {
+      channel.sendToQueue(
+        flags.refreshQueueName,
+        Buffer.from(JSON.stringify(msg)),
+        {
+          persistent: true,
+        },
+      );
+    };
+
     const uploadServer = new UploadServer(database);
-    const plaidServer = new PlaidServer(configuration, database, plaidClient);
+    const plaidServer = new PlaidServer(
+      configuration,
+      database,
+      plaidClient,
+      publishRefresh,
+    );
     const tranServer = new TransactionServer(database, processor, rollupper);
 
     const app = express();
@@ -60,6 +81,18 @@ WebCommand.description = `Start the web server
 `;
 
 WebCommand.flags = {
+  amqpAddress: oclif.flags.string({
+    char: 'a',
+    env: 'AMQP_ADDRESS',
+    description: 'address of the AMQP server to use',
+    required: true,
+  }),
+  refreshQueueName: oclif.flags.string({
+    char: 'a',
+    env: 'REFRESH_QUEUE_NAME',
+    description: 'name of the AMQP queue from which to consume refresh events',
+    default: 'refresh-plaid-transactions',
+  }),
   port: oclif.flags.integer({
     char: 'p',
     env: 'APP_PORT',
