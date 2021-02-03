@@ -70,11 +70,11 @@ class PlaidServer {
     for (let i = accts.length - 1; i >= 0; i--) {
       // TODO remove
       logger.info({
-        item_id: accts.item_id,
+        item_id: accts.sourceSystemId,
         lookback_days: days,
       });
       this.publishRefresh({
-        item_id: accts.item_id,
+        item_id: accts.sourceSystemId,
         lookback_days: days,
       });
     }
