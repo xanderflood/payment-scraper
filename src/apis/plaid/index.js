@@ -6,11 +6,12 @@ const { statsdPath } = require('../../utils');
 const logger = new Logger();
 
 class PlaidServer {
-  constructor(configuration, database, plaid) {
+  constructor(configuration, database, plaid, publishRefresh) {
     this.configuration = configuration;
     this.router = new Router();
     this.database = database;
     this.client = plaid;
+    this.publishRefresh = publishRefresh;
 
     this.router.use(bodyParser.urlencoded({ extended: false }));
     this.router.use(bodyParser.json());
@@ -38,6 +39,42 @@ class PlaidServer {
       statsdPath('plaid_save_synced_account'),
       this.saveSyncedAccount.bind(this),
     );
+    this.router.post(
+      '/refresh_all_items',
+      statsdPath('plaid_refresh_all_items'),
+      this.refreshAllItems.bind(this),
+    );
+  }
+
+  async refreshAllItems(request, response) {
+    let days;
+    try {
+      days = Number(request.body.lookback_days);
+    } catch (error) {
+      logger.error('error parsing lookback_days - responding with 400:', error);
+      response.status(400).json({ error });
+    }
+
+    let accts;
+    try {
+      accts = await this.database.getPlaidSyncedAccounts();
+    } catch (error) {
+      logger.error(
+        'error fetching saved plaid accounts - responding with 500:',
+        error,
+      );
+      response.status(500).json({ error });
+      return;
+    }
+
+    for (let i = accts.length - 1; i >= 0; i--) {
+      this.publishRefresh({
+        item_id: accts[i].sourceSystemId,
+        lookback_days: days,
+      });
+    }
+
+    response.status(200).json({});
   }
 
   async createLinkToken(request, response) {

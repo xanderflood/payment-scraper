@@ -230,6 +230,12 @@ class Database {
     return this.models.SyncedAccount.upsert(whitelistedFields);
   }
 
+  async getPlaidSyncedAccounts() {
+    return this.models.SyncedAccount.findAll({
+      where: { sourceSystem: 'PLAID' },
+    });
+  }
+
   async getSyncedAccount(sourceSystem, sourceSystemId) {
     const identifiers = {
       sourceSystem,
