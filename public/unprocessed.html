@@ -123,18 +123,17 @@
           for (var i = selected.length - 1; i >= 0; i--) {
             // TODO perform in serial, then re-enable the button
             var row = selected[i];
-            var rowData = row.data();
             $.ajax({
               type: 'POST',
               url: '/api/transactions/categorize',
               data: JSON.stringify({
-                trShortId: rowData.shortId,
+                trShortId: selected[i].shortId,
                 catSlug: slug,
               }),
               contentType: 'application/json; charset=utf-8',
               dataType: 'json',
               success: function () {
-                console.log('categorized ' + rowData.shortId);
+                table.ajax.reload(null, false);
               },
               error: function () {
                 alert('Failed categorizing transaction');
