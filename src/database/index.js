@@ -287,7 +287,9 @@ WHERE (amortize IS NULL
 SELECT * FROM rollups
 WHERE daterange(${start}, ${end}) @> month_start::date
 `)
-    )[0];
+    )[0]
+      .sort((r) => r.monthStart)
+      .reverse();
   }
 }
 

@@ -3,7 +3,6 @@ const { DateTime } = require('luxon');
 const { errString } = require('../utils');
 
 const logger = new Logger();
-const DEFAULT_LOOKBACK_MONTHS = 12;
 
 class Rollupper {
   constructor(database) {
@@ -61,11 +60,12 @@ class Rollupper {
   }
 
   async rollupRecentMonths(lookbackMonths) {
-    let start = Rollupper.startOfThisMonth().minus({
-      months: lookbackMonths || DEFAULT_LOOKBACK_MONTHS,
-    });
+    const today = DateTime.local();
+    start = DateTime.local(today.year, today.month);
+
+    let start = Rollupper.startOfThisMonth().minus({ months: lookbackMonths });
     let end = start.plus({ months: 1 });
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; start > today; i++) {
       try {
         await this.upsertRollupRecordForPeriod(start, end);
       } catch (error) {
@@ -80,11 +80,6 @@ class Rollupper {
       start = end;
       end = start.plus({ months: 1 });
     }
-  }
-
-  static startOfThisMonth() {
-    const start = DateTime.local();
-    return DateTime.local(start.year, start.month);
   }
 }
 
