@@ -61,11 +61,17 @@ class Rollupper {
 
   async rollupRecentMonths(lookbackMonths) {
     const today = DateTime.local();
-    start = DateTime.local(today.year, today.month);
 
-    let start = Rollupper.startOfThisMonth().minus({ months: lookbackMonths });
+    let start = DateTime.local(today.year, today.month).minus({
+      months: lookbackMonths,
+    });
     let end = start.plus({ months: 1 });
-    for (let i = 0; start > today; i++) {
+
+    const next = () => {
+      start = end;
+      end = start.plus({ months: 1 });
+    };
+    for (; start <= today; next()) {
       try {
         await this.upsertRollupRecordForPeriod(start, end);
       } catch (error) {
@@ -75,10 +81,6 @@ class Rollupper {
         );
         throw error;
       }
-
-      // switch to the next month
-      start = end;
-      end = start.plus({ months: 1 });
     }
   }
 }
