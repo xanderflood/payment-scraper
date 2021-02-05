@@ -34,7 +34,7 @@ class CSVCommand extends oclif.Command {
         objectMode: true,
         async write(record, _, next) {
           try {
-            await db.createTransaction(record);
+            await db.upsertTransaction(record);
             next();
           } catch (e) {
             next(e);

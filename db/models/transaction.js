@@ -1,6 +1,3 @@
-/* eslint-disable no-param-reassign */
-
-const crypto = require('crypto');
 const { Model } = require('sequelize');
 
 module.exports = (sequelize, DataTypes) => {
@@ -87,25 +84,5 @@ module.exports = (sequelize, DataTypes) => {
       tableName: 'transactions',
     },
   );
-  Transaction.beforeSave(async (tr) => {
-    tr.sourceSystem = tr.sourceSystem || 'other';
-    tr.sourceSystemId =
-      tr.sourceSystemId ||
-      crypto
-        .createHash('md5')
-        .update(
-          [tr.amountString, tr.merchant, tr.merchant, tr.transactionDate].join(
-            '\0',
-          ),
-        )
-        .digest('hex');
-
-    tr.sourceSystemDigest =
-      tr.sourceSystemDigest ||
-      crypto
-        .createHash('md5')
-        .update(JSON.stringify(tr.sourceSystemMeta))
-        .digest('hex');
-  });
   return Transaction;
 };
