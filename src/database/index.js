@@ -148,7 +148,7 @@ class Database {
     return transactions[0];
   }
 
-  async upsertSyncedTransaction(attrs) {
+  async upsertTransaction(attrs) {
     const whitelistedFields = (({
       sourceSystem,
       syncedAccountId,
