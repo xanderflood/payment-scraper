@@ -1,7 +1,7 @@
 const oclif = require('@oclif/command');
 const plaid = require('plaid');
 const Logger = require('node-json-logger');
-const amqp = require('amqplib');
+const mq = require('../mq');
 const { WebhookServer } = require('../apis/webhooks');
 
 const logger = new Logger();
@@ -15,35 +15,17 @@ class WebhookAPICommand extends oclif.Command {
       env: plaid.environments[flags.plaidEnv],
     });
 
-    const conn = await amqp.connect(flags.amqpAddress);
-    const channel = await conn.createChannel();
-    await channel.assertQueue(flags.revokeQueueName);
-    await channel.assertQueue(flags.refreshQueueName);
-
-    const publishRefresh = function (msg) {
-      channel.sendToQueue(
-        flags.refreshQueueName,
-        Buffer.from(JSON.stringify(msg)),
-        {
-          persistent: true,
-        },
-      );
-    };
-    const publishRevoke = function (msg) {
-      channel.sendToQueue(
-        flags.revokeQueueName,
-        Buffer.from(JSON.stringify(msg)),
-        {
-          persistent: true,
-        },
-      );
-    };
+    const channel = await mq.Connect(flags.amqpAddress);
+    const pubRefresh = new mq.Producer(channel, flags.refreshQueueName);
+    const pubRevoke = new mq.Producer(channel, flags.revokeQueueName);
+    await pubRefresh.init();
+    await pubRevoke.init();
 
     const app = new WebhookServer(
       flags.port,
       plaidClient,
-      publishRefresh,
-      publishRevoke,
+      pubRefresh,
+      pubRevoke,
     );
 
     logger.info('starting webhook API...');

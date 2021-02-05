@@ -6,12 +6,12 @@ const { statsdPath } = require('../../utils');
 const logger = new Logger();
 
 class PlaidServer {
-  constructor(configuration, database, plaid, publishRefresh) {
+  constructor(configuration, database, plaid, refresh) {
     this.configuration = configuration;
     this.router = new Router();
     this.database = database;
     this.client = plaid;
-    this.publishRefresh = publishRefresh;
+    this.refresh = refresh;
 
     this.router.use(bodyParser.urlencoded({ extended: false }));
     this.router.use(bodyParser.json());
@@ -68,7 +68,7 @@ class PlaidServer {
     }
 
     for (let i = accts.length - 1; i >= 0; i--) {
-      this.publishRefresh({
+      this.refresh.publish({
         item_id: accts[i].sourceSystemId,
         lookback_days: days,
       });

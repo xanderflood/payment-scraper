@@ -33,19 +33,16 @@ class RefreshPlaidTransactionsConsumerCommand extends oclif.Command {
         !msg.item_id.length ||
         typeof msg.lookback_days !== 'number'
       ) {
-        logger.info('reject');
         reject(msg);
         return;
       }
 
-      logger.info(msg);
       try {
         await pm.pullRecentTransactions(msg.item_id, msg.lookback_days);
       } catch (error) {
         logger.error('failed refreshing plaid transactions', {
           error: errString(error),
         });
-        logger.info('fail');
         fail();
         return;
       }

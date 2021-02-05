@@ -10,7 +10,7 @@ const Logger = require('node-json-logger');
 const logger = new Logger();
 
 class WebhookServer {
-  constructor(port, plaid, publishRefresh, publishRevoke) {
+  constructor(port, plaid, refresh, revoke) {
     this.port = port;
     this.app = express();
     this.plaid = plaid;
@@ -32,13 +32,13 @@ class WebhookServer {
         }
 
         if (WebhookServer.shouldRemoveTransactions(request.body.webhook_code)) {
-          publishRevoke({
+          revoke.publish({
             plaid_transaction_ids: request.body.removed_transactions,
           });
         } else if (
           WebhookServer.shouldRefreshTransactions(request.body.webhook_code)
         ) {
-          publishRefresh({
+          refresh.publish({
             item_id: request.body.item_id,
             lookback_days: WebhookServer.lookbackDaysForCode(
               request.body.webhook_code,

@@ -1,11 +1,11 @@
 const oclif = require('@oclif/command');
 const plaid = require('plaid');
 const Logger = require('node-json-logger');
-const amqp = require('amqplib');
 const Statsd = require('statsd-client');
 const { Database } = require('../database');
 const { PlaidManager } = require('../plaid');
 const { errString } = require('../utils');
+const mq = require('../mq');
 
 class RefreshPlaidTransactionsConsumerCommand extends oclif.Command {
   async run() {
@@ -22,34 +22,31 @@ class RefreshPlaidTransactionsConsumerCommand extends oclif.Command {
     const db = new Database(flags.development);
     const pm = new PlaidManager(plaidClient, db, statsd);
 
-    const conn = await amqp.connect(flags.amqpAddress);
-    const ch = await conn.createChannel();
-    await ch.assertQueue(flags.revokeQueueName);
+    const channel = await mq.Connect(flags.amqpAddress);
+    const consumer = new mq.Consumer(channel, flags.revokeQueueName, msgStats);
+    await consumer.init();
 
     logger.info('starting revoke consumer...');
-    ch.prefetch(1);
-    ch.consume(flags.revokeQueueName, async (msg) => {
-      const msgObj = JSON.parse(msg.content);
-      msgStats.increment('revoke_msg_received');
+    consumer.consume(async (msg, reject, fail, success) => {
       if (
-        typeof msgObj.plaid_transaction_ids !== 'string' ||
-        !msgObj.plaid_transaction_ids.length
+        typeof msg.plaid_transaction_ids !== 'string' ||
+        !msg.plaid_transaction_ids.length
       ) {
-        ch.reject(msg, false);
+        reject(msg, false);
         return;
       }
 
-      logger.info(msgObj);
       try {
-        await pm.deletePlaidTransactions(msgObj.plaid_transaction_ids);
+        await pm.deletePlaidTransactions(msg.plaid_transaction_ids);
       } catch (error) {
         logger.error('failed revoking plaid transactions', {
           error: errString(error),
         });
-        ch.reject(msg, true);
+        fail();
         return;
       }
-      ch.ack(msg);
+
+      success();
     });
   }
 }
