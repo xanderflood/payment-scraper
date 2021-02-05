@@ -88,7 +88,7 @@ class UploadServer {
       transformer.on('error', reject);
 
       return input.pipe(csvParser).pipe(transformer);
-    }, this.database.createTransaction.bind(this.database));
+    }, this.database.upsertTransaction.bind(this.database));
   }
 }
 
