@@ -1,11 +1,11 @@
 const oclif = require('@oclif/command');
 const plaid = require('plaid');
 const Logger = require('node-json-logger');
-const amqp = require('amqplib');
 const Statsd = require('statsd-client');
 const { Database } = require('../database');
 const { PlaidManager } = require('../plaid');
 const { errString } = require('../utils');
+const mq = require('../mq');
 
 class RefreshPlaidTransactionsConsumerCommand extends oclif.Command {
   async run() {
@@ -22,38 +22,32 @@ class RefreshPlaidTransactionsConsumerCommand extends oclif.Command {
     const db = new Database(flags.development);
     const pm = new PlaidManager(plaidClient, db, statsd);
 
-    const conn = await amqp.connect(flags.amqpAddress);
-    const ch = await conn.createChannel();
-    await ch.assertQueue(flags.refreshQueueName);
+    const channel = await mq.Connect(flags.amqpAddress);
+    const consumer = new mq.Consumer(channel, flags.refreshQueueName, msgStats);
+    await consumer.init();
 
     logger.info('starting refresh consumer...');
-    ch.prefetch(1);
-    ch.consume(flags.refreshQueueName, async (msg) => {
-      const msgObj = JSON.parse(msg.content);
-      msgStats.increment('refresh_msg_received');
+    consumer.consume(async (msg, reject, fail, success) => {
       if (
-        typeof msgObj.item_id !== 'string' ||
-        !msgObj.item_id.length ||
-        typeof msgObj.lookback_days !== 'number'
+        typeof msg.item_id !== 'string' ||
+        !msg.item_id.length ||
+        typeof msg.lookback_days !== 'number'
       ) {
-        logger.info('reject');
-        ch.reject(msg, false);
+        reject(msg);
         return;
       }
 
-      logger.info(msgObj);
       try {
-        await pm.pullRecentTransactions(msgObj.item_id, msgObj.lookback_days);
+        await pm.pullRecentTransactions(msg.item_id, msg.lookback_days);
       } catch (error) {
         logger.error('failed refreshing plaid transactions', {
           error: errString(error),
         });
-        logger.info('reject');
-        ch.reject(msg, true);
+        fail();
         return;
       }
-      logger.info('ack');
-      ch.ack(msg);
+
+      success();
     });
   }
 }

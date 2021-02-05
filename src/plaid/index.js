@@ -52,7 +52,7 @@ class PlaidManager {
       logger.info(`upserting ${trResponse.transactions.length} transactions`);
       for (let i = trResponse.transactions.length - 1; i >= 0; i--) {
         const tr = trResponse.transactions[i];
-        await this.database.upsertSyncedTransaction({
+        await this.database.upsertTransaction({
           sourceSystem: 'PLAID',
           syncedAccountId: acct.id,
           sourceSystemId: tr.transaction_id,

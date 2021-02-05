@@ -5,6 +5,7 @@ const { DateTime } = require('luxon');
 const { errString, statsdPath } = require('../../utils');
 
 const logger = new Logger();
+const DEFAULT_LOOKBACK_MONTHS = 12;
 
 class TransactionServer {
   constructor(database, processor, rollupper) {
@@ -214,7 +215,7 @@ class TransactionServer {
 
   async buildRecentRollups(request, response) {
     try {
-      await this.rollupper.rollupRecentMonths();
+      await this.rollupper.rollupRecentMonths(DEFAULT_LOOKBACK_MONTHS);
     } catch (error) {
       logger.error(
         'error building rollups - responding with 500',

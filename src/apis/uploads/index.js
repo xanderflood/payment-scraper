@@ -5,7 +5,7 @@ const fs = require('fs');
 const csv = require('csv');
 const { Writable } = require('stream');
 const { TransactionParser } = require('../../csv');
-const { statsdPath } = require('../../utils');
+const { statsdPath, errString } = require('../../utils');
 
 const logger = new Logger();
 
@@ -88,7 +88,7 @@ class UploadServer {
       transformer.on('error', reject);
 
       return input.pipe(csvParser).pipe(transformer);
-    }, this.database.createTransaction.bind(this.database));
+    }, this.database.upsertTransaction.bind(this.database));
   }
 }
 
@@ -103,7 +103,7 @@ function genericUploadHandler(wrap, handle) {
         } catch (e) {
           logger.error(
             'failed opening file for ingestion - aborting',
-            e.toString(),
+            errString(e),
           );
           response.status(500).json({});
           return;
@@ -130,23 +130,26 @@ function genericUploadHandler(wrap, handle) {
               .on('finish', resolve)
               .on('error', reject);
           });
-        } catch (e) {
-          logger.error('failed streaming records for ingestion - aborting', e);
+        } catch (error) {
+          logger.error(
+            'failed streaming records for ingestion - aborting',
+            errString(error),
+          );
           response.status(500).json({});
           return;
         }
       }
 
       response.json({ status: 200, message: 'success' });
-    } catch (e) {
-      logger.error('unknown failure, responding with 500', e);
+    } catch (error) {
+      logger.error('unknown failure, responding with 500', errString(error));
       response.status(500).json({});
     } finally {
       for (let i = request.files.length - 1; i >= 0; i--) {
         try {
           await fs.promises.unlink(request.files[i].path);
         } catch (error) {
-          logger.error('failed deleting - carrying on', error);
+          logger.error('failed deleting - carrying on', errString(error));
         }
       }
     }

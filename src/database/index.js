@@ -1,6 +1,4 @@
-const Logger = require('node-json-logger');
-
-const logger = new Logger();
+const crypto = require('crypto');
 
 class RecordNotFoundError extends Error {
   constructor(type, id) {
@@ -78,41 +76,6 @@ class Database {
     return this.models.Transaction.findAll({ where: identifiers });
   }
 
-  async createTransaction(attrs) {
-    const whitelistedFields = (({
-      sourceSystem,
-      sourceSystemId,
-      sourceSystemMeta,
-      transactionDate,
-      institution,
-      merchant,
-      amountString,
-      amount,
-      notes,
-    }) => ({
-      sourceSystem,
-      sourceSystemId,
-      sourceSystemMeta,
-      transactionDate,
-      institution,
-      merchant,
-      amountString,
-      amount,
-      notes,
-    }))(attrs);
-
-    try {
-      return await this.models.Transaction.create(whitelistedFields);
-    } catch (e) {
-      if (e.name === 'SequelizeUniqueConstraintError') {
-        logger.info('skipping duplicate source system identifier');
-      } else {
-        logger.error(e);
-      }
-      return false;
-    }
-  }
-
   async saveTransactionProcessingResult(trId, update) {
     let catId;
     if (update.catSlug) {
@@ -148,7 +111,7 @@ class Database {
     return transactions[0];
   }
 
-  async upsertSyncedTransaction(attrs) {
+  async upsertTransaction(attrs) {
     const whitelistedFields = (({
       sourceSystem,
       syncedAccountId,
@@ -173,6 +136,7 @@ class Database {
       notes,
     }))(attrs);
 
+    Database.setTransactionDefaults(whitelistedFields);
     return this.models.Transaction.upsert(whitelistedFields);
   }
 
@@ -287,7 +251,30 @@ WHERE (amortize IS NULL
 SELECT * FROM rollups
 WHERE daterange(${start}, ${end}) @> month_start::date
 `)
-    )[0];
+    )[0]
+      .sort((r) => r.monthStart)
+      .reverse();
+  }
+
+  static setTransactionDefaults(tr) {
+    tr.sourceSystem = tr.sourceSystem || 'other'; // eslint-disable-line no-param-reassign
+    tr.sourceSystemId = // eslint-disable-line no-param-reassign
+      tr.sourceSystemId ||
+      crypto
+        .createHash('md5')
+        .update(
+          [tr.amountString, tr.merchant, tr.merchant, tr.transactionDate].join(
+            '\0',
+          ),
+        )
+        .digest('hex');
+
+    tr.sourceSystemDigest = // eslint-disable-line no-param-reassign
+      tr.sourceSystemDigest ||
+      crypto
+        .createHash('md5')
+        .update(JSON.stringify(tr.sourceSystemMeta))
+        .digest('hex');
   }
 }
 

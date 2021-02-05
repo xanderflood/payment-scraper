@@ -2,7 +2,6 @@ const oclif = require('@oclif/command');
 const express = require('express');
 const plaid = require('plaid');
 const expressStatsd = require('express-statsd');
-const amqp = require('amqplib');
 const Logger = require('node-json-logger');
 const { Database } = require('../database');
 const { Processor } = require('../processor');
@@ -10,6 +9,7 @@ const { Rollupper } = require('../rollups');
 const { PlaidServer } = require('../apis/plaid');
 const { UploadServer } = require('../apis/uploads');
 const { TransactionServer } = require('../apis/transactions');
+const mq = require('../mq');
 
 const logger = new Logger();
 
@@ -32,27 +32,16 @@ class WebCommand extends oclif.Command {
     const processor = new Processor(database);
     const rollupper = new Rollupper(database);
 
-    const conn = await amqp.connect(flags.amqpAddress);
-    const channel = await conn.createChannel();
-    await channel.assertQueue(flags.revokeQueueName);
-    await channel.assertQueue(flags.refreshQueueName);
-
-    const publishRefresh = function (msg) {
-      channel.sendToQueue(
-        flags.refreshQueueName,
-        Buffer.from(JSON.stringify(msg)),
-        {
-          persistent: true,
-        },
-      );
-    };
+    const channel = await mq.Connect(flags.amqpAddress);
+    const pubRefresh = new mq.Producer(channel, flags.refreshQueueName);
+    await pubRefresh.init();
 
     const uploadServer = new UploadServer(database);
     const plaidServer = new PlaidServer(
       configuration,
       database,
       plaidClient,
-      publishRefresh,
+      pubRefresh,
     );
     const tranServer = new TransactionServer(database, processor, rollupper);
 

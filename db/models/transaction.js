@@ -1,4 +1,3 @@
-const crypto = require('crypto');
 const { Model } = require('sequelize');
 
 module.exports = (sequelize, DataTypes) => {
@@ -85,11 +84,5 @@ module.exports = (sequelize, DataTypes) => {
       tableName: 'transactions',
     },
   );
-  Transaction.beforeCreate(async (tr) => {
-    tr.sourceSystemDigest = crypto // eslint-disable-line no-param-reassign
-      .createHash('md5')
-      .update(JSON.stringify(tr.sourceSystemMeta))
-      .digest('hex');
-  });
   return Transaction;
 };
