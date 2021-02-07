@@ -60,7 +60,7 @@ class PlaidManager {
 
           transactionDate: tr.date,
           merchant: tr.merchant_name,
-          amount: tr.amount,
+          amount: -tr.amount,
           institution: plaidAccountsReference[tr.account_id].name,
           notes: tr.name,
         });
