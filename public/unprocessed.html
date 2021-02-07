@@ -81,14 +81,10 @@
         var table = $('#transaction_table').DataTable({
           ajax: '/api/transactions/unprocessed',
           select: 'multiple',
+          order: [[1, 'desc']],
           columns: [
             { data: 'shortId' },
-            {
-              data: 'transactionDate',
-              render: function (data) {
-                return data.split('T')[0];
-              },
-            },
+            { data: 'transactionDate' },
             { data: 'merchant' },
             {
               data: 'amount',

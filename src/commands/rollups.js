@@ -14,7 +14,7 @@ class RollupsCommand extends oclif.Command {
 
     logger.info('starting rollup job');
 
-    await rollupper.rollupRecentMonths();
+    await rollupper.rollupRecentMonths(12);
   }
 }
 
