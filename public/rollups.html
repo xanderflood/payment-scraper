@@ -65,7 +65,7 @@
             for (var i = resp.result.length - 1; i >= 0; i--) {
               const cat = userCategories[resp.result[i].cat];
               columns.push({
-                title: resp.result[i].month_start.split('T')[0],
+                title: resp.result[i].display_date,
                 render: $.fn.dataTable.render.number(',', '.', 2, '$'),
                 defaultContent: '$0.00',
               });

@@ -228,9 +228,13 @@ class Database {
     return (
       await this.models.sequelize.query(`
 SELECT * FROM transactions
-WHERE (amortize IS NULL
-    AND daterange(${start}, ${end}) @> transaction_date::date
-  ) OR NOT (daterange(${start}, ${end}) && amortize)
+WHERE NOT is_transfer AND (
+  (
+    amortize IS NULL
+    AND daterange(${start}, ${end}) @> transaction_date::date)
+  OR (
+    amortize IS NOT NULL AND
+    (daterange(${start}, ${end}) && amortize)))
 `)
     )[0];
   }

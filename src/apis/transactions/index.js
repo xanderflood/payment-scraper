@@ -197,10 +197,15 @@ class TransactionServer {
 
     let rollups;
     try {
-      rollups = await this.database.getRollupsForPeriod(
-        startDate.toJSDate(),
-        endDate.toJSDate(),
-      );
+      rollups = (
+        await this.database.getRollupsForPeriod(
+          startDate.toJSDate(),
+          endDate.toJSDate(),
+        )
+      ).map((r) => {
+        r.displayDate = r.monthStart.toLocaleString(DateTime.DATE);
+        return r;
+      });
     } catch (error) {
       logger.error(
         'error getting rollups - responding with 500',
