@@ -203,7 +203,7 @@ class TransactionServer {
           endDate.toJSDate(),
         )
       ).map((r) => {
-        r.display_date = r.month_start.toLocaleString(DateTime.DATE); // disable-eslint-line no-param-reassign
+        r.display_date = r.month_start.toLocaleString(DateTime.DATE); // eslint-disable-line no-param-reassign
         return r;
       });
     } catch (error) {
