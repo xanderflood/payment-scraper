@@ -19,28 +19,14 @@
       href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css"
     />
     <link rel="stylesheet" type="text/css" href="./static/style.css" />
+    <link
+      rel="stylesheet"
+      href="//code.jquery.com/ui/1.12.1/themes/smoothness/jquery-ui.css"
+    />
 
     <meta name="viewport" content="width=device-width, initial-scale=1" />
   </head>
   <body>
-    <div id="categorize_card" class="card card-default">
-      <div class="card-heading">
-        <a data-toggle="collapse" href="#categorize_collapse"
-          ><h3>Categorize</h3></a
-        >
-      </div>
-      <div id="categorize_collapse" class="card-collapse collapse">
-        <div class="card-body">
-          <form id="categorize_form">
-            <input type="text" /><br />
-            <select size="1" id="cat_slug"></select
-            ><br />
-            <input type="submit" />
-          </form>
-        </div>
-      </div>
-    </div>
-
     <table id="transaction_table" class="display" style="width: 100%">
       <thead>
         <tr>
@@ -49,6 +35,9 @@
           <th>Merchant</th>
           <th>Amount</th>
           <th>Notes</th>
+          <th>Category</th>
+          <th>Notes</th>
+          <th>Transfer</th>
           <th></th>
         </tr>
       </thead>
@@ -59,6 +48,9 @@
           <th>Merchant</th>
           <th>Amount</th>
           <th>Notes</th>
+          <th></th>
+          <th></th>
+          <th></th>
           <th></th>
         </tr>
       </tfoot>
@@ -76,8 +68,27 @@
     ></script>
     <script src="https://cdn.datatables.net/1.10.22/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/select/1.3.1/js/dataTables.select.min.js"></script>
+    <script src="//code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
     <script type="text/javascript">
-      $(function () {
+      var catAutocompleteData = [];
+      $.get('/api/transactions/categories')
+        .done(function (resp) {
+          $(function () {
+            for (var i = resp.data.length - 1; i >= 0; i--) {
+              catAutocompleteData.push({
+                label: resp.data[i].name,
+                value: resp.data[i].slug,
+              });
+            }
+
+            setupTable();
+          });
+        })
+        .fail(function (err) {
+          alert('Failed fetching categories');
+        });
+
+      function setupTable() {
         var table = $('#transaction_table').DataTable({
           ajax: '/api/transactions/unprocessed',
           select: 'multiple',
@@ -92,97 +103,157 @@
             },
             { data: 'notes' },
             {
+              data: null,
+              render: function (data, type, row) {
+                return '<input class="cat-autocomplete row-input" />';
+              },
+              createdCell: function (td, cellData, rowData, row, col) {
+                $(td).find('.cat-autocomplete').autocomplete({
+                  source: catAutocompleteData,
+                });
+              },
+            },
+            {
+              data: null,
+              render: function (data, type, row) {
+                return '<input class="notes row-input" type="text" />';
+              },
+            },
+            {
+              data: null,
+              render: function (data, type, row) {
+                return '<input class="transfer row-input" type="checkbox" />';
+              },
+              data: null,
+              createdCell: function (td, cellData, rowData, row, col) {
+                $(td)
+                  .find('.transfer')
+                  .change(function () {
+                    row = $(td).closest('tr');
+                    if (this.checked) {
+                      $(row).find('.cat-autocomplete').prop('disabled', true);
+                    } else {
+                      $(row).find('.cat-autocomplete').prop('disabled', false);
+                    }
+                  });
+              },
+            },
+            {
               render: function (data, type, row) {
                 return (
-                  '<button class="transfer-button" data-transaction-id="' +
+                  '<button class="process-button row-input" data-transaction-id="' +
                   row.id +
-                  '">Transfer</button>'
+                  '">Process</button>'
                 );
               },
             },
           ],
         });
 
-        var slugSelect = $('#cat_slug');
-        var form = $('#categorize_form');
+        function selectRow(tr) {
+          $('#transaction_table tbody tr.selected').toggleClass('selected');
+          tr.toggleClass('selected');
+          tr.find('.cat-autocomplete').focus();
+        }
 
-        $('#transaction_table tbody').on('click', 'tr', function () {
-          $(this).toggleClass('selected');
-        });
+        function getProcessBodyForRow(tr) {
+          const trid = tr.find('button.process-button').data().transactionId;
+          var transfer = tr.find('.transfer').is(':checked');
+          var notes = tr.find('.notes').val();
 
-        form.submit(function (e) {
-          e.preventDefault();
-          var selected = table.rows('.selected').data();
-          var slug = slugSelect.val();
-
-          // TODO disable button
-          for (var i = selected.length - 1; i >= 0; i--) {
-            // TODO perform in serial, then re-enable the button
-            var row = selected[i];
-            $.ajax({
-              type: 'POST',
-              url: '/api/transactions/categorize',
-              data: JSON.stringify({
-                trShortId: selected[i].shortId,
-                catSlug: slug,
-              }),
-              contentType: 'application/json; charset=utf-8',
-              dataType: 'json',
-              success: function () {
-                table.ajax.reload(null, false);
-              },
-              error: function () {
-                alert('Failed categorizing transaction');
-              },
-            });
+          var catSlug;
+          if (!transfer) {
+            catSlug = tr.find('.cat-autocomplete').val();
           }
 
-          return false;
+          return JSON.stringify({
+            trShortId: trid,
+            isTransfer: transfer,
+            notes: notes,
+            catSlug: catSlug,
+          });
+        }
+
+        function submitRow(tr) {
+          var body = getProcessBodyForRow(tr);
+          console.log(body);
+
+          $.ajax({
+            type: 'POST',
+            url: '/api/transactions/categorize',
+            data: body,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            success: function () {
+              table.ajax.reload(null, false);
+            },
+            error: function () {
+              alert('Failed updating transaction!');
+            },
+          });
+        }
+
+        $('#transaction_table tbody').on('click', 'tr', function (e) {
+          selectRow($(e.currentTarget));
+        });
+
+        var keyListening = true;
+        $('#transaction_table tbody').on('autocompleteopen', 'input.cat-autocomplete', function (e) {
+          console.log("off");
+          keyListening = false;
+        });
+        $('#transaction_table tbody').on('autocompleteclose', 'input.cat-autocomplete', function (e) {
+          console.log("on");
+          keyListening = true;
+        });
+        $(document).keyup(function (event) {
+          var selected = $('#transaction_table tbody tr.selected');
+          if (!keyListening) return;
+
+          switch (event.which) {
+            case 13: //Enter
+              if (selected.length) {
+                submitRow(selected);
+              }
+              break;
+            case 38: //Arrow up
+              if (!selected.length) {
+                selectRow($('#transaction_table tbody tr').first());
+                return;
+              } else {
+                selectRow(selected.prev());
+              }
+              break;
+            case 40: //Arrow down
+                  var tag = event.target.tagName.toLowerCase();
+                  console.log("TAG", tag);
+              if (!selected.length) {
+                selectRow($('#transaction_table tbody tr').first());
+                return;
+              } else {
+                selectRow(selected.next());
+              }
+              break;
+          }
+        });
+
+        $('#transaction_table tbody').on('focus', 'input.row-input', function (e) {
+          var row = $(e.currentTarget).closest('tr');
+          if (!row.hasClass('selected')) selectRow(row);
         });
 
         $('#transaction_table').on(
           'click',
-          'button.transfer-button',
+          'button.process-button',
           function (e) {
-            const trid = $(this).data().transactionId;
             e.stopPropagation();
             e.preventDefault();
 
-            $.ajax({
-              type: 'POST',
-              url: '/api/transactions/categorize',
-              data: JSON.stringify({
-                trShortId: trid,
-                isTransfer: true,
-              }),
-              contentType: 'application/json; charset=utf-8',
-              dataType: 'json',
-              success: function () {
-                table.ajax.reload(null, false);
-              },
-              error: function () {
-                alert('Failed marking transaction as transfer');
-              },
-            });
+            var row = $(e.currentTarget).closest('tr');
+            submitRow(row);
           },
         );
-      });
-
-      $.get('/api/transactions/categories')
-        .done(function (resp) {
-          $(function () {
-            var select = document.getElementById('cat_slug');
-            for (var i = resp.data.length - 1; i >= 0; i--) {
-              var opt = document.createElement('option');
-              opt.value = resp.data[i].slug;
-              opt.textContent = resp.data[i].name;
-              select.appendChild(opt);
-            }
-          });
-        })
-        .fail(function (err) {
-          alert('Failed fetching categories');
-        });
+      }
     </script>
   </body>
 </html>
