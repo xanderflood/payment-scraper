@@ -52,6 +52,7 @@ class PlaidManager {
       logger.info(`upserting ${trResponse.transactions.length} transactions`);
       for (let i = trResponse.transactions.length - 1; i >= 0; i--) {
         const tr = trResponse.transactions[i];
+        if (!tr.authorized_date) continue;
         await this.database.upsertTransaction({
           sourceSystem: 'PLAID',
           syncedAccountId: acct.id,
