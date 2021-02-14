@@ -51,7 +51,9 @@
           <th></th>
           <th></th>
           <th></th>
-          <th></th>
+          <th>
+            <button class="process-all-button">Process All</button>
+          </th>
         </tr>
       </tfoot>
     </table>
@@ -174,9 +176,16 @@
           });
         }
 
+        function rowIsSet(tr) {
+          var transfer = tr.find('.transfer').is(':checked');
+          if (transfer) return true;
+
+          var catSlug = tr.find('.cat-autocomplete').val();
+          return !!catSlug;
+        }
+
         function submitRow(tr) {
           var body = getProcessBodyForRow(tr);
-          console.log(body);
 
           $.ajax({
             type: 'POST',
@@ -185,11 +194,18 @@
             contentType: 'application/json; charset=utf-8',
             dataType: 'json',
             success: function () {
-              table.ajax.reload(null, false);
+              table.row(tr).remove().draw();
             },
             error: function () {
               alert('Failed updating transaction!');
             },
+          });
+        }
+
+        function submitMany() {
+          $('#transaction_table tbody tr').each(function(i, row) {
+            row = $(row);
+            if (rowIsSet(row)) submitRow(row);
           });
         }
 
@@ -199,11 +215,9 @@
 
         var keyListening = true;
         $('#transaction_table tbody').on('autocompleteopen', 'input.cat-autocomplete', function (e) {
-          console.log("off");
           keyListening = false;
         });
         $('#transaction_table tbody').on('autocompleteclose', 'input.cat-autocomplete', function (e) {
-          console.log("on");
           keyListening = true;
         });
         $(document).keyup(function (event) {
@@ -212,8 +226,10 @@
 
           switch (event.which) {
             case 13: //Enter
-              if (selected.length) {
-                submitRow(selected);
+              if (event.ctrlKey) {
+                submitMany();
+              } else if (selected.length) {
+                submitRow(selected.first());
               }
               break;
             case 38: //Arrow up
@@ -225,14 +241,20 @@
               }
               break;
             case 40: //Arrow down
-                  var tag = event.target.tagName.toLowerCase();
-                  console.log("TAG", tag);
               if (!selected.length) {
                 selectRow($('#transaction_table tbody tr').first());
                 return;
               } else {
                 selectRow(selected.next());
               }
+              break;
+            case 32: //Space
+              event.stopPropagation();
+              event.preventDefault();
+
+              var checkbox = selected.find('input.transfer');
+              checkbox.focus();
+              checkbox.prop("checked", !checkbox.prop("checked"));
               break;
           }
         });
@@ -241,6 +263,15 @@
           var row = $(e.currentTarget).closest('tr');
           if (!row.hasClass('selected')) selectRow(row);
         });
+
+        $('button.process-all-button').click(
+          function (e) {
+            e.stopPropagation();
+            e.preventDefault();
+
+            submitMany();
+          },
+        );
 
         $('#transaction_table').on(
           'click',
