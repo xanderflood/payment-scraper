@@ -61,8 +61,10 @@
             var columns = [{ title: 'Category', data: 0 }],
               data = [];
             var rowsByCategoryID = { null: 0 };
+
+            // Build and push a row for uncategorized transactions
             const nullRow = ['N/A'];
-            for (var i = resp.result.length - 1; i >= 0; i--) {
+            for (var i = 0; i < resp.result.length; i++) {
               const cat = userCategories[resp.result[i].cat];
               columns.push({
                 title: resp.result[i].display_date,
@@ -74,10 +76,11 @@
             }
             data.push(nullRow);
 
-            for (var j = userCategories.length - 1; j >= 0; j--) {
+            // Build a row for each category
+            for (var j = 0; j < userCategories.length; j++) {
               const catObj = userCategories[j];
               var row = [catObj.name];
-              for (var i = resp.result.length - 1; i >= 0; i--) {
+              for (var i = 0; i < resp.result.length; i++) {
                 const rollup = resp.result[i].rollup;
                 row.push(rollup[catObj.id] || 0);
               }

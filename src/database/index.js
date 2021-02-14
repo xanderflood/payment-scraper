@@ -253,11 +253,10 @@ WHERE NOT is_transfer AND (
     return (
       await this.models.sequelize.query(`
 SELECT * FROM rollups
-WHERE daterange(${start}, ${end}) @> month_start::date
+  WHERE daterange(${start}, ${end}) @> month_start::date
+  ORDER BY month_start DESC
 `)
-    )[0]
-      .sort((r) => r.monthStart)
-      .reverse();
+    )[0];
   }
 
   static setTransactionDefaults(tr) {
