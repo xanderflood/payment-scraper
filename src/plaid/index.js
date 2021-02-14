@@ -52,19 +52,20 @@ class PlaidManager {
       logger.info(`upserting ${trResponse.transactions.length} transactions`);
       for (let i = trResponse.transactions.length - 1; i >= 0; i--) {
         const tr = trResponse.transactions[i];
-        if (!tr.authorized_date) continue;
-        await this.database.upsertTransaction({
-          sourceSystem: 'PLAID',
-          syncedAccountId: acct.id,
-          sourceSystemId: tr.transaction_id,
-          sourceSystemMeta: tr,
+        if (tr.authorized_date) {
+          await this.database.upsertTransaction({
+            sourceSystem: 'PLAID',
+            syncedAccountId: acct.id,
+            sourceSystemId: tr.transaction_id,
+            sourceSystemMeta: tr,
 
-          transactionDate: tr.date,
-          merchant: tr.merchant_name,
-          amount: -tr.amount,
-          institution: plaidAccountsReference[tr.account_id].name,
-          notes: tr.name,
-        });
+            transactionDate: tr.date,
+            merchant: tr.merchant_name,
+            amount: -tr.amount,
+            institution: plaidAccountsReference[tr.account_id].name,
+            notes: tr.name,
+          });
+        }
         this.stats.increment('plaid_transaction_upserted');
       }
     }
