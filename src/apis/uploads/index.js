@@ -131,6 +131,7 @@ function genericUploadHandler(wrap, handle) {
               .on('error', reject);
           });
         } catch (error) {
+          logger.error(error);
           logger.error(
             'failed streaming records for ingestion - aborting',
             errString(error),
