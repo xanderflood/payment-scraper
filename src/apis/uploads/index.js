@@ -116,7 +116,6 @@ function genericUploadHandler(wrap, handle) {
               await handle(record);
               next();
             } catch (e) {
-              console.log('writing', e);
               next(e);
             }
           },
@@ -124,22 +123,14 @@ function genericUploadHandler(wrap, handle) {
 
         try {
           await new Promise((resolve, reject) => {
-            // TODO is this failing to propagate errors? do I need to pull the error off the event object?
-            input.on('error', (e) => {
-              console.log('promise', e);
-              reject(e);
-            });
+            input.on('error', reject);
 
             wrap(input, reject)
               .pipe(upserter)
               .on('finish', resolve)
-              .on('error', (e) => {
-                console.log('wrap', e);
-                reject(e);
-              });
+              .on('error', reject);
           });
         } catch (error) {
-          logger.error(error);
           logger.error(
             'failed streaming records for ingestion - aborting',
             errString(error),

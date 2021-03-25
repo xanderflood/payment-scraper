@@ -1,8 +1,7 @@
 const { Transform } = require('stream');
-const { errString } = require('../utils');
 
 const venmoHeader = [
-  'Username',
+  '',
   'ID',
   'Datetime',
   'Type',
@@ -58,19 +57,19 @@ const boaBankHeader = ['Description', '', 'Summary Amt.'];
 class InvalidFormatError extends Error {
   constructor(message) {
     super(message);
-    this.name = "InvalidFormatError";
+    this.name = 'InvalidFormatError';
   }
 }
 class InvalidRowClassificationError extends Error {
   constructor(message) {
     super(message);
-    this.name = "InvalidRowClassificationError";
+    this.name = 'InvalidRowClassificationError';
   }
 }
 class UnrecognizedAdapterError extends Error {
   constructor(message) {
     super(message);
-    this.name = "UnrecognizedAdapterError";
+    this.name = 'UnrecognizedAdapterError';
   }
 }
 
@@ -234,88 +233,82 @@ class TransactionParser extends Transform {
   }
 
   _transform(row, encoding, callback) {
-    try {
-      console.log('transforming', row);
-      this.lineOffset++;
+    this.lineOffset++;
 
-      // see if we have enough information to initialize the adapter
-      if (!this.adapter) {
-        if (!this.mode) {
-          // give up if we can't choose an adapter within 5 lines
-          if (this.lineOffset > 5) {
-            console.log("missing the error!")
-            callback(new InvalidFormatError());
-          }
-
-          this.lineOffset++;
-
-          this.mode = classifyFile(row);
-          if (!this.mode) {
-            callback();
-            return;
-          }
+    // see if we have enough information to initialize the adapter
+    if (!this.adapter) {
+      if (!this.mode) {
+        // give up if we can't choose an adapter within 5 lines
+        if (this.lineOffset > 5) {
+          callback(new InvalidFormatError());
         }
 
-        const fct = adapterFactories[this.mode];
-        if (!fct) callback(new UnrecognizedAdapterError());
-        this.adapter = fct();
-        this.skipRows = this.adapter.skipRows + 1 || 2;
-        this.idFunc = this.adapter.id ? this.adapter.id : () => null;
-        this.deferUpserts = !!this.adapter.id;
-      }
+        this.lineOffset++;
 
-      // some adapters need us to skip more rows than are required to identify the mode
-      if (this.lineOffset < this.skipRows) {
-        callback();
-        return;
-      }
-
-      this.rowOffset++;
-      let transfer = false;
-      let output;
-      const val = this.adapter.classify(row, this.rowOffset);
-      switch (val) {
-        case 'skip':
+        this.mode = classifyFile(row);
+        if (!this.mode) {
           callback();
           return;
-        case 'transfer':
-          transfer = true;
-        case 'regular': // eslint-disable-line no-fallthrough
-          output = {
-            sourceSystem: `csv|${this.mode}`,
-            sourceSystemId: this.idFunc(row),
-            sourceSystemMeta: [row],
-
-            transactionDate: normalizeDate(this.adapter.date(row)),
-            institution: this.adapter.institution(),
-            merchant: this.adapter.merchant(row),
-            amountString: this.adapter.amount(row),
-            amount: parseFloat(this.adapter.amount(row).replace(/[$\s,]/g, '')),
-            notes: this.adapter.notes(row),
-
-            isTransfer: transfer,
-          };
-
-          if (!this.deferUpserts) {
-            this.push(output);
-          } else {
-            const key = `${output.sourceSystem}|${output.sourceSystemId}|${output.transactionDate}`;
-            if (!this._transactions[key]) {
-              this._transactions[key] = output;
-            } else {
-              this._transactions[key] = mergeTransactions(
-                this._transactions[key],
-                output,
-              );
-            }
-          }
-          callback();
-          break;
-        default:
-          callback(new InvalidRowClassificationError());
+        }
       }
-    } catch (error) {
-      console.log('caught one!', errString(error));
+
+      const fct = adapterFactories[this.mode];
+      if (!fct) callback(new UnrecognizedAdapterError());
+      this.adapter = fct();
+      this.skipRows = this.adapter.skipRows + 1 || 2;
+      this.idFunc = this.adapter.id ? this.adapter.id : () => null;
+      this.deferUpserts = !!this.adapter.id;
+    }
+
+    // some adapters need us to skip more rows than are required to identify the mode
+    if (this.lineOffset < this.skipRows) {
+      callback();
+      return;
+    }
+
+    this.rowOffset++;
+    let transfer = false;
+    let output;
+    const val = this.adapter.classify(row, this.rowOffset);
+    switch (val) {
+      case 'skip':
+        callback();
+        return;
+      case 'transfer':
+        transfer = true;
+      case 'regular': // eslint-disable-line no-fallthrough
+        output = {
+          sourceSystem: `csv|${this.mode}`,
+          sourceSystemId: this.idFunc(row),
+          sourceSystemMeta: [row],
+
+          transactionDate: normalizeDate(this.adapter.date(row)),
+          institution: this.adapter.institution(),
+          merchant: this.adapter.merchant(row),
+          amountString: this.adapter.amount(row),
+          amount: parseFloat(this.adapter.amount(row).replace(/[$\s,]/g, '')),
+          notes: this.adapter.notes(row),
+
+          isTransfer: transfer,
+        };
+
+        if (!this.deferUpserts) {
+          this.push(output);
+        } else {
+          const key = `${output.sourceSystem}|${output.sourceSystemId}|${output.transactionDate}`;
+          if (!this._transactions[key]) {
+            this._transactions[key] = output;
+          } else {
+            this._transactions[key] = mergeTransactions(
+              this._transactions[key],
+              output,
+            );
+          }
+        }
+        callback();
+        break;
+      default:
+        callback(new InvalidRowClassificationError());
     }
   }
 
