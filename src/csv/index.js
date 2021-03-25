@@ -218,6 +218,7 @@ class TransactionParser extends Transform {
   }
 
   _transform(row, encoding, callback) {
+    console.log('transforming', row);
     this.lineOffset++;
 
     // see if we have enough information to initialize the adapter
