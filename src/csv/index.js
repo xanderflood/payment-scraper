@@ -55,9 +55,24 @@ const capitalOneHeader = [
 ];
 const boaBankHeader = ['Description', '', 'Summary Amt.'];
 
-class InvalidFormatError extends Error {}
-class InvalidRowClassificationError extends Error {}
-class UnrecognizedAdapterError extends Error {}
+class InvalidFormatError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "InvalidFormatError";
+  }
+}
+class InvalidRowClassificationError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "InvalidRowClassificationError";
+  }
+}
+class UnrecognizedAdapterError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "UnrecognizedAdapterError";
+  }
+}
 
 function arrayEqual(a, b) {
   return a.length === b.length && a.every((u, i) => u === b[i]);
@@ -228,6 +243,7 @@ class TransactionParser extends Transform {
         if (!this.mode) {
           // give up if we can't choose an adapter within 5 lines
           if (this.lineOffset > 5) {
+            console.log("missing the error!")
             callback(new InvalidFormatError());
           }
 
