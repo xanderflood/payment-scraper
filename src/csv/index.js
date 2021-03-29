@@ -233,11 +233,13 @@ class TransactionParser extends Transform {
   }
 
   _transform(row, encoding, callback) {
+    console.log('row', row);
     this.lineOffset++;
 
     // see if we have enough information to initialize the adapter
     if (!this.adapter) {
       if (!this.mode) {
+        console.log('classifying');
         // give up if we can't choose an adapter within 5 lines
         if (this.lineOffset > 5) {
           callback(new InvalidFormatError());
@@ -247,11 +249,13 @@ class TransactionParser extends Transform {
 
         this.mode = classifyFile(row);
         if (!this.mode) {
+          console.log('classified', this.mode);
           callback();
           return;
         }
       }
 
+      console.log('initializing');
       const fct = adapterFactories[this.mode];
       if (!fct) callback(new UnrecognizedAdapterError());
       this.adapter = fct();
@@ -262,6 +266,7 @@ class TransactionParser extends Transform {
 
     // some adapters need us to skip more rows than are required to identify the mode
     if (this.lineOffset < this.skipRows) {
+      console.log('skipping by count');
       callback();
       return;
     }
@@ -272,11 +277,14 @@ class TransactionParser extends Transform {
     const val = this.adapter.classify(row, this.rowOffset);
     switch (val) {
       case 'skip':
+        console.log('skipping');
         callback();
         return;
       case 'transfer':
+        console.log('(transfer)');
         transfer = true;
       case 'regular': // eslint-disable-line no-fallthrough
+        console.log('transaction');
         output = {
           sourceSystem: `csv|${this.mode}`,
           sourceSystemId: this.idFunc(row),
