@@ -250,11 +250,9 @@ class TransactionParser extends Transform {
       if (!this.adapter) {
         if (!this.mode) {
           // give up if we can't choose an adapter within 5 lines
-          if (this.lineOffset > 5) {
+          if (this.lineOffset > 10) {
             callback(new InvalidFormatError());
           }
-
-          this.lineOffset++;
 
           this.mode = classifyFile(row);
           if (!this.mode) {
