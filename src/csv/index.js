@@ -213,6 +213,8 @@ function classifyFile(firstRow) {
 
 function normalizeDate(date) {
   const d = new Date(Date.parse(date));
+  if (isNan(d.getMonth()) || isNan(d.getDate()) || isNan(d.getYear()))
+    throw new Error(`failed to normalize date string: "${date}"`);
   return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
 }
 
