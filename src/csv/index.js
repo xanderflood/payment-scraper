@@ -321,7 +321,9 @@ class TransactionParser extends Transform {
   }
 
   _flush(callback) {
+    console.log('_flushing');
     if (this.deferUpserts) {
+      console.log('deferred');
       const keys = Object.keys(this._transactions);
       for (let i = keys.length - 1; i >= 0; i--) {
         this.push(this._transactions[keys[i]]);
