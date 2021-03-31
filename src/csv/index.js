@@ -243,97 +243,92 @@ class TransactionParser extends Transform {
 
   _transform(row, encoding, callback) {
     console.log('row', row);
-    this.lineOffset++;
+    try {
+      this.lineOffset++;
 
-    // see if we have enough information to initialize the adapter
-    if (!this.adapter) {
-      if (!this.mode) {
-        console.log('classifying');
-        // give up if we can't choose an adapter within 5 lines
-        if (this.lineOffset > 5) {
-          callback(new InvalidFormatError());
-        }
-
-        this.lineOffset++;
-
-        this.mode = classifyFile(row);
+      // see if we have enough information to initialize the adapter
+      if (!this.adapter) {
         if (!this.mode) {
-          console.log('classified', this.mode);
-          callback();
-          return;
-        }
-      }
+          // give up if we can't choose an adapter within 5 lines
+          if (this.lineOffset > 5) {
+            callback(new InvalidFormatError());
+          }
 
-      console.log('initializing');
-      const fct = adapterFactories[this.mode];
-      if (!fct) callback(new UnrecognizedAdapterError());
-      this.adapter = fct();
-      this.skipRows = this.adapter.skipRows + 1 || 2;
-      this.idFunc = this.adapter.id ? this.adapter.id : () => null;
-      this.deferUpserts = !!this.adapter.id;
-    }
+          this.lineOffset++;
 
-    // some adapters need us to skip more rows than are required to identify the mode
-    if (this.lineOffset < this.skipRows) {
-      console.log('skipping by count');
-      callback();
-      return;
-    }
-
-    this.rowOffset++;
-    let transfer = false;
-    let output;
-    const val = this.adapter.classify(row, this.rowOffset);
-    switch (val) {
-      case 'skip':
-        console.log('skipping');
-        callback();
-        return;
-      case 'transfer':
-        console.log('(transfer)');
-        transfer = true;
-      case 'regular': // eslint-disable-line no-fallthrough
-        console.log('transaction');
-        const amountString = this.adapter.amount(row);
-        output = {
-          sourceSystem: `csv|${this.mode}`,
-          sourceSystemId: this.idFunc(row),
-          sourceSystemMeta: [row],
-
-          transactionDate: normalizeDate(this.adapter.date(row)),
-          institution: this.adapter.institution(),
-          merchant: this.adapter.merchant(row),
-          amountString: amountString,
-          amount: normalizeAmount(amountString),
-          notes: this.adapter.notes(row),
-
-          isTransfer: transfer,
-        };
-
-        if (!this.deferUpserts) {
-          this.push(output);
-        } else {
-          const key = `${output.sourceSystem}|${output.sourceSystemId}|${output.transactionDate}`;
-          if (!this._transactions[key]) {
-            this._transactions[key] = output;
-          } else {
-            this._transactions[key] = mergeTransactions(
-              this._transactions[key],
-              output,
-            );
+          this.mode = classifyFile(row);
+          if (!this.mode) {
+            callback();
+            return;
           }
         }
+
+        const fct = adapterFactories[this.mode];
+        if (!fct) callback(new UnrecognizedAdapterError());
+        this.adapter = fct();
+        this.skipRows = this.adapter.skipRows + 1 || 2;
+        this.idFunc = this.adapter.id ? this.adapter.id : () => null;
+        this.deferUpserts = !!this.adapter.id;
+      }
+
+      // some adapters need us to skip more rows than are required to identify the mode
+      if (this.lineOffset < this.skipRows) {
         callback();
-        break;
-      default:
-        callback(new InvalidRowClassificationError());
+        return;
+      }
+
+      this.rowOffset++;
+      let transfer = false;
+      let output;
+      const val = this.adapter.classify(row, this.rowOffset);
+      switch (val) {
+        case 'skip':
+          callback();
+          return;
+        case 'transfer':
+          transfer = true;
+        case 'regular': // eslint-disable-line no-fallthrough
+          const amountString = this.adapter.amount(row);
+          output = {
+            sourceSystem: `csv|${this.mode}`,
+            sourceSystemId: this.idFunc(row),
+            sourceSystemMeta: [row],
+
+            transactionDate: normalizeDate(this.adapter.date(row)),
+            institution: this.adapter.institution(),
+            merchant: this.adapter.merchant(row),
+            amountString: amountString,
+            amount: normalizeAmount(amountString),
+            notes: this.adapter.notes(row),
+
+            isTransfer: transfer,
+          };
+
+          if (!this.deferUpserts) {
+            this.push(output);
+          } else {
+            const key = `${output.sourceSystem}|${output.sourceSystemId}|${output.transactionDate}`;
+            if (!this._transactions[key]) {
+              this._transactions[key] = output;
+            } else {
+              this._transactions[key] = mergeTransactions(
+                this._transactions[key],
+                output,
+              );
+            }
+          }
+          callback();
+          break;
+        default:
+          callback(new InvalidRowClassificationError());
+      }
+    } catch (error) {
+      callback(error);
     }
   }
 
   _flush(callback) {
-    console.log('_flushing');
     if (this.deferUpserts) {
-      console.log('deferred');
       const keys = Object.keys(this._transactions);
       for (let i = keys.length - 1; i >= 0; i--) {
         this.push(this._transactions[keys[i]]);
