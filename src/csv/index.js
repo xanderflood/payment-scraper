@@ -213,9 +213,16 @@ function classifyFile(firstRow) {
 
 function normalizeDate(date) {
   const d = new Date(Date.parse(date));
-  if (isNan(d.getMonth()) || isNan(d.getDate()) || isNan(d.getYear()))
+  if (isNaN(d.getMonth()) || isNaN(d.getDate()) || isNaN(d.getYear()))
     throw new Error(`failed to normalize date string: "${date}"`);
   return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+}
+function normalizeAmount(amount) {
+  const cleaned = amount.replace(/[$\s,]/g, '');
+  const value = parseFloat(cleaned);
+  if (isNaN(value))
+    throw new Error(`failed to normalize dollar amount string: "${cleaned}"`);
+  return value;
 }
 
 class TransactionParser extends Transform {
@@ -287,6 +294,7 @@ class TransactionParser extends Transform {
         transfer = true;
       case 'regular': // eslint-disable-line no-fallthrough
         console.log('transaction');
+        const amountString = this.adapter.amount(row);
         output = {
           sourceSystem: `csv|${this.mode}`,
           sourceSystemId: this.idFunc(row),
@@ -295,8 +303,8 @@ class TransactionParser extends Transform {
           transactionDate: normalizeDate(this.adapter.date(row)),
           institution: this.adapter.institution(),
           merchant: this.adapter.merchant(row),
-          amountString: this.adapter.amount(row),
-          amount: parseFloat(this.adapter.amount(row).replace(/[$\s,]/g, '')),
+          amountString: amountString,
+          amount: normalizeAmount(amountString),
           notes: this.adapter.notes(row),
 
           isTransfer: transfer,
