@@ -112,7 +112,6 @@ class Database {
   }
 
   async upsertTransaction(attrs) {
-    console.log(attrs);
     const whitelistedFields = (({
       sourceSystem,
       syncedAccountId,

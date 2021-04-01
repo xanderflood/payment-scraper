@@ -163,6 +163,7 @@ const adapterFactories = {
         return `Venmo - ${row[6]}`;
       },
       institution: () => 'venmo',
+      skipRows: 3,
     };
   },
   cashApp: () => ({
@@ -200,20 +201,37 @@ const adapterFactories = {
   }),
 };
 
-function classifyFile(firstRow) {
-  if (arrayEqual(firstRow, boaCreditHeader)) return 'boaCredit';
-  if (arrayEqual(firstRow, boaBankHeader)) return 'boaBank';
-  if (arrayEqual(firstRow, venmoHeader)) return 'venmo';
-  if (arrayEqual(firstRow, cashAppHeader)) return 'cashApp';
-  if (arrayEqual(firstRow, capitalOneHeader)) return 'capitalOne';
-  if (firstRow[0] && firstRow[0].startsWith('Account Name : ')) return 'delta';
+function checkHeaderPatterns(possibleHeaderRow) {
+  if (arrayEqual(possibleHeaderRow, boaCreditHeader)) return 'boaCredit';
+  if (arrayEqual(possibleHeaderRow, boaBankHeader)) return 'boaBank';
+  if (arrayEqual(possibleHeaderRow, venmoHeader)) return 'venmo';
+  if (arrayEqual(possibleHeaderRow, cashAppHeader)) return 'cashApp';
+  if (arrayEqual(possibleHeaderRow, capitalOneHeader)) return 'capitalOne';
+  if (
+    possibleHeaderRow[0] &&
+    possibleHeaderRow[0].startsWith('Account Name : ')
+  )
+    return 'delta';
 
   return '';
 }
 
 function normalizeDate(date) {
   const d = new Date(Date.parse(date));
+  if (
+    Number.isNaN(d.getMonth()) ||
+    Number.isNaN(d.getDate()) ||
+    Number.isNaN(d.getYear())
+  )
+    throw new Error(`failed to normalize date string: "${date}"`);
   return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+}
+function normalizeAmount(amount) {
+  const cleaned = amount.replace(/[$\s,]/g, '');
+  const value = parseFloat(cleaned);
+  if (Number.isNaN(value))
+    throw new Error(`failed to normalize dollar amount string: "${cleaned}"`);
+  return value;
 }
 
 class TransactionParser extends Transform {
@@ -233,82 +251,93 @@ class TransactionParser extends Transform {
   }
 
   _transform(row, encoding, callback) {
-    this.lineOffset++;
+    try {
+      this.lineOffset++;
 
-    // see if we have enough information to initialize the adapter
-    if (!this.adapter) {
-      if (!this.mode) {
+      // see if we have enough information to initialize the adapter
+      if (!this.adapter) {
         // give up if we can't choose an adapter within 5 lines
-        if (this.lineOffset > 5) {
+        if (this.lineOffset > 10) {
           callback(new InvalidFormatError());
+          return;
         }
 
-        this.lineOffset++;
-
-        this.mode = classifyFile(row);
+        this.mode = checkHeaderPatterns(row);
         if (!this.mode) {
           callback();
           return;
         }
-      }
 
-      const fct = adapterFactories[this.mode];
-      if (!fct) callback(new UnrecognizedAdapterError());
-      this.adapter = fct();
-      this.skipRows = this.adapter.skipRows + 1 || 2;
-      this.idFunc = this.adapter.id ? this.adapter.id : () => null;
-      this.deferUpserts = !!this.adapter.id;
-    }
+        const fct = adapterFactories[this.mode];
+        if (!fct) {
+          callback(new UnrecognizedAdapterError());
+          return;
+        }
 
-    // some adapters need us to skip more rows than are required to identify the mode
-    if (this.lineOffset < this.skipRows) {
-      callback();
-      return;
-    }
+        this.adapter = fct();
+        this.skipRows = this.adapter.skipRows || 1;
+        this.idFunc = this.adapter.id ? this.adapter.id : () => null;
+        this.deferUpserts = !!this.adapter.id;
 
-    this.rowOffset++;
-    let transfer = false;
-    let output;
-    const val = this.adapter.classify(row, this.rowOffset);
-    switch (val) {
-      case 'skip':
+        // always skip the header row
         callback();
         return;
-      case 'transfer':
-        transfer = true;
-      case 'regular': // eslint-disable-line no-fallthrough
-        output = {
-          sourceSystem: `csv|${this.mode}`,
-          sourceSystemId: this.idFunc(row),
-          sourceSystemMeta: [row],
+      }
 
-          transactionDate: normalizeDate(this.adapter.date(row)),
-          institution: this.adapter.institution(),
-          merchant: this.adapter.merchant(row),
-          amountString: this.adapter.amount(row),
-          amount: parseFloat(this.adapter.amount(row).replace(/[$\s,]/g, '')),
-          notes: this.adapter.notes(row),
-
-          isTransfer: transfer,
-        };
-
-        if (!this.deferUpserts) {
-          this.push(output);
-        } else {
-          const key = `${output.sourceSystem}|${output.sourceSystemId}|${output.transactionDate}`;
-          if (!this._transactions[key]) {
-            this._transactions[key] = output;
-          } else {
-            this._transactions[key] = mergeTransactions(
-              this._transactions[key],
-              output,
-            );
-          }
-        }
+      // some adapters need us to skip more rows than are required to identify the mode
+      if (this.lineOffset <= this.skipRows) {
         callback();
-        break;
-      default:
-        callback(new InvalidRowClassificationError());
+        return;
+      }
+
+      this.rowOffset++;
+      let transfer = false;
+      let output;
+      let amountString;
+      const val = this.adapter.classify(row, this.rowOffset);
+      switch (val) {
+        case 'skip':
+          callback();
+          return;
+        case 'transfer':
+          transfer = true;
+        case 'regular': // eslint-disable-line no-fallthrough
+          amountString = this.adapter.amount(row);
+          output = {
+            sourceSystem: `csv|${this.mode}`,
+            sourceSystemId: this.idFunc(row),
+            sourceSystemMeta: [row],
+
+            transactionDate: normalizeDate(this.adapter.date(row)),
+            institution: this.adapter.institution(),
+            merchant: this.adapter.merchant(row),
+            amountString,
+            amount: normalizeAmount(amountString),
+            notes: this.adapter.notes(row),
+
+            isTransfer: transfer,
+          };
+
+          if (!this.deferUpserts) {
+            this.push(output);
+          } else {
+            const key = `${output.sourceSystem}|${output.sourceSystemId}|${output.transactionDate}`;
+            if (!this._transactions[key]) {
+              this._transactions[key] = output;
+            } else {
+              this._transactions[key] = mergeTransactions(
+                this._transactions[key],
+                output,
+              );
+            }
+          }
+          callback();
+          break;
+        default:
+          callback(new InvalidRowClassificationError());
+      }
+    } catch (error) {
+      callback(error);
     }
   }
 
