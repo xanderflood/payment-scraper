@@ -3,6 +3,4 @@ node_js: [12]
 services:
   - docker
 
-script:
-- echo "skipping tests"
 after_script: [./build_and_push.sh]
