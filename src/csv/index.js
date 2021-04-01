@@ -207,21 +207,29 @@ function checkHeaderPatterns(possibleHeaderRow) {
   if (arrayEqual(possibleHeaderRow, venmoHeader)) return 'venmo';
   if (arrayEqual(possibleHeaderRow, cashAppHeader)) return 'cashApp';
   if (arrayEqual(possibleHeaderRow, capitalOneHeader)) return 'capitalOne';
-  if (possibleHeaderRow[0] && possibleHeaderRow[0].startsWith('Account Name : ')) return 'delta';
+  if (
+    possibleHeaderRow[0] &&
+    possibleHeaderRow[0].startsWith('Account Name : ')
+  )
+    return 'delta';
 
   return '';
 }
 
 function normalizeDate(date) {
   const d = new Date(Date.parse(date));
-  if (isNaN(d.getMonth()) || isNaN(d.getDate()) || isNaN(d.getYear()))
+  if (
+    Number.isNaN(d.getMonth()) ||
+    Number.isNaN(d.getDate()) ||
+    Number.isNaN(d.getYear())
+  )
     throw new Error(`failed to normalize date string: "${date}"`);
   return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
 }
 function normalizeAmount(amount) {
   const cleaned = amount.replace(/[$\s,]/g, '');
   const value = parseFloat(cleaned);
-  if (isNaN(value))
+  if (Number.isNaN(value))
     throw new Error(`failed to normalize dollar amount string: "${cleaned}"`);
   return value;
 }
@@ -243,7 +251,6 @@ class TransactionParser extends Transform {
   }
 
   _transform(row, encoding, callback) {
-    console.log('row', row);
     try {
       this.lineOffset++;
 
@@ -286,6 +293,7 @@ class TransactionParser extends Transform {
       this.rowOffset++;
       let transfer = false;
       let output;
+      let amountString;
       const val = this.adapter.classify(row, this.rowOffset);
       switch (val) {
         case 'skip':
@@ -294,7 +302,7 @@ class TransactionParser extends Transform {
         case 'transfer':
           transfer = true;
         case 'regular': // eslint-disable-line no-fallthrough
-          const amountString = this.adapter.amount(row);
+          amountString = this.adapter.amount(row);
           output = {
             sourceSystem: `csv|${this.mode}`,
             sourceSystemId: this.idFunc(row),
@@ -303,7 +311,7 @@ class TransactionParser extends Transform {
             transactionDate: normalizeDate(this.adapter.date(row)),
             institution: this.adapter.institution(),
             merchant: this.adapter.merchant(row),
-            amountString: amountString,
+            amountString,
             amount: normalizeAmount(amountString),
             notes: this.adapter.notes(row),
 

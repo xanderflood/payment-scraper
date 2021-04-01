@@ -97,7 +97,6 @@ function genericUploadHandler(wrap, handle) {
   return async (request, response) => {
     try {
       for (let i = request.files.length - 1; i >= 0; i--) {
-        console.log('file', i);
         let input;
         try {
           input = fs.createReadStream(request.files[i].path);
