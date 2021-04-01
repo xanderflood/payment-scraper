@@ -163,6 +163,7 @@ const adapterFactories = {
         return `Venmo - ${row[6]}`;
       },
       institution: () => 'venmo',
+      skipRows: 3,
     };
   },
   cashApp: () => ({
@@ -200,13 +201,13 @@ const adapterFactories = {
   }),
 };
 
-function classifyFile(firstRow) {
-  if (arrayEqual(firstRow, boaCreditHeader)) return 'boaCredit';
-  if (arrayEqual(firstRow, boaBankHeader)) return 'boaBank';
-  if (arrayEqual(firstRow, venmoHeader)) return 'venmo';
-  if (arrayEqual(firstRow, cashAppHeader)) return 'cashApp';
-  if (arrayEqual(firstRow, capitalOneHeader)) return 'capitalOne';
-  if (firstRow[0] && firstRow[0].startsWith('Account Name : ')) return 'delta';
+function checkHeaderPatterns(possibleHeaderRow) {
+  if (arrayEqual(possibleHeaderRow, boaCreditHeader)) return 'boaCredit';
+  if (arrayEqual(possibleHeaderRow, boaBankHeader)) return 'boaBank';
+  if (arrayEqual(possibleHeaderRow, venmoHeader)) return 'venmo';
+  if (arrayEqual(possibleHeaderRow, cashAppHeader)) return 'cashApp';
+  if (arrayEqual(possibleHeaderRow, capitalOneHeader)) return 'capitalOne';
+  if (possibleHeaderRow[0] && possibleHeaderRow[0].startsWith('Account Name : ')) return 'delta';
 
   return '';
 }
@@ -248,29 +249,36 @@ class TransactionParser extends Transform {
 
       // see if we have enough information to initialize the adapter
       if (!this.adapter) {
-        if (!this.mode) {
-          // give up if we can't choose an adapter within 5 lines
-          if (this.lineOffset > 10) {
-            callback(new InvalidFormatError());
-          }
+        // give up if we can't choose an adapter within 5 lines
+        if (this.lineOffset > 10) {
+          callback(new InvalidFormatError());
+          return;
+        }
 
-          this.mode = classifyFile(row);
-          if (!this.mode) {
-            callback();
-            return;
-          }
+        this.mode = checkHeaderPatterns(row);
+        if (!this.mode) {
+          callback();
+          return;
         }
 
         const fct = adapterFactories[this.mode];
-        if (!fct) callback(new UnrecognizedAdapterError());
+        if (!fct) {
+          callback(new UnrecognizedAdapterError());
+          return;
+        }
+
         this.adapter = fct();
-        this.skipRows = this.adapter.skipRows + 1 || 2;
+        this.skipRows = this.adapter.skipRows || 1;
         this.idFunc = this.adapter.id ? this.adapter.id : () => null;
         this.deferUpserts = !!this.adapter.id;
+
+        // always skip the header row
+        callback();
+        return;
       }
 
       // some adapters need us to skip more rows than are required to identify the mode
-      if (this.lineOffset < this.skipRows) {
+      if (this.lineOffset <= this.skipRows) {
         callback();
         return;
       }
